@@ -13,15 +13,16 @@ portfolio = {
 ticker = {
     'BTC':response['bpi']['USD']['rate']
 }
-investments = {
-    'BTC' : 0
-}
 totalValue = 0
 commission = 0.002
 print(ticker["BTC"])
 print(response['time']['updated'])
+
+
 def calculateTotalValue():
-    p=1+1
+    my_shares = np.array(portfolio)
+    prices = np.array(ticker)
+    return buyingPower+np.sum(np.multiply(my_shares, prices))
 
 def buy(n):
     global buyingPower, totalValue, portfolio
@@ -31,6 +32,16 @@ def buy(n):
         return
     print("Bought "+n+" shares at "+ticker["BTC"])
     buyingPower -= cost
-    portfolio["BTC"] += n*ticker["BTC"]
-    totalValue = buyingPower + sum(portfolio.values())
-    calculateTotalValue()
+    portfolio["BTC"] += n
+    totalValue=calculateTotalValue()
+
+def sell(n):
+    global buyingPower, totalValue, portfolio
+    cost = (n*ticker["BTC"])*(1-commission)
+    if(n>portfolio["BTC"]):
+        print("You don't have enough shares")
+        return
+    print("Sold "+n+" shares at "+ticker["BTC"])
+    buyingPower += cost
+    portfolio["BTC"] -= n
+    totalValue=calculateTotalValue()
