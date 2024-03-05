@@ -11,7 +11,8 @@ portfolio = {
     'BTC':.5,
 }
 ticker = {
-    'BTC':float(response['bpi']['USD']['rate'].replace(',', ''))
+    'BTC':float(
+        ['USD']['rate'].replace(',', ''))
 }
 totalValue = 0
 commission = 0.002
