@@ -1,35 +1,41 @@
-import { useState, useEffect } from 'react'
-import './App.css'
-import tradeList from './tradeList'
+// src/App.js
+import Price from './Components/price.jsx';
+import React, { useEffect, useState } from 'react';
 
 function App() {
-  const [trades, setTrades] = useState([])
-  const [email, setEmail] = useState(existingContact.email||"")
+  const [data, setData] = useState([]);
 
   useEffect(() => {
-    fetchTrades()
-  }, [])
-  const fetchTrades = async () =>{
-    const response = await fetch("http://127.0.0.1:5000/trades", "GET")
-    const data = await response.json()
-    setTrades(data.trades)
-    console.log(data.trades)
-  }
-  /**const tradeLong = async () =>{
-    const response = await fetch("http://127.0.0.1:5000/trades", "POST")
-    if(response.status !== 201&& response.status !== 200){
-      const data = await response.json()
-      alert(data.message)
-  }else{
-      updateCallback()
-  }
-  }**/
+    const ws = new WebSocket('ws://localhost:8000/ws');
+    
+    // On connection
+    ws.onopen = () => {
+      console.log("Connected to WebSocket server");
+    };
+    
+    // On receiving data from server
+    ws.onmessage = (event) => {
+      const newData = JSON.parse(event.data);
+      console.log("Received data:", newData);
+      setData(newData);
+    };
+    
+    // On closing connection
+    ws.onclose = () => {
+      console.log("Disconnected from WebSocket server");
+    };
+    
+    // On error
+    ws.onerror = (error) => {
+      console.error("WebSocket error:", error);
+    };
+  }, []); // Empty dependency array
+
   return (
-    <>
-      <tradeList trades = {trades}/>
-      <button onClick={openCreateModal}>Create new order</button>
-    </>
-  )
+    <div className="App">
+      <Price data={data} />
+    </div>
+  );
 }
 
-export default App
+export default App;

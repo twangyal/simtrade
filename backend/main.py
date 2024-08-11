@@ -1,85 +1,74 @@
-import numpy as np
-import requests
+import os
 import json
-import datetime
+import asyncio
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from dotenv import load_dotenv
+import websockets
+from contextlib import asynccontextmanager
 
-from models import Trade
-from flask import request, jsonify
-from config import app, db
+load_dotenv("api.env")
+app = FastAPI()
+API_KEY = os.getenv("API_KEY")
+WEB_SOCKET_URL = f"wss://ws.twelvedata.com/v1/quotes/price?apikey={API_KEY}"
+
+current_price = 0
+current_instrument = ""
+connected_clients = []
 
 
-"""buyingPower = 25000
-portfolio = {
-    'BTC':.5,
-}
-ticker = {
-    'BTC':float(
-        ['USD']['rate'].replace(',', ''))
-}
-totalValue = 0
-commission = 0.002
-print(type(ticker["BTC"]))
-print(response['time']['updated'])"""
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(receive_data_from_api())
 
-#Get a database of all trades made
-@app.route("/trades",methods=["GET"])
-def get_trades():
-    trades = Trade.query.all()
-    json_trades = list(map(lambda x: x.to_json(), trades))
-    return jsonify({"trades": json_trades}),200
 
-#Make a trade
-@app.route("/create_trade", methods=["POST"])
-def create_trade():
-    buy_or_sell = request.json.get("buyOrSell")
-    instrument = request.json.get("instrument")
-    time = int(datetime.now())
-
-    if not buy_or_sell or not instrument:
-        return(
-            jsonify({"message": "You must include an instrument"}),
-            400,
-        )
-
-    new_trade = Trade(instrument=instrument,buy_or_sell=buy_or_sell,time=time)
+async def receive_data_from_api():
     try:
-        db.session.add(new_trade)
-        db.session.commit()
+        # Connect to the WebSocket API
+        async with websockets.connect(WEB_SOCKET_URL) as ws:
+            # Send subscription message
+            subscribe_message = {
+                "action": "subscribe",
+                "params": {
+                    "symbols": "BTC/USD"
+                }
+            }
+            await ws.send(json.dumps(subscribe_message))
+            
+            while True:
+                try:
+                    response = await ws.recv()
+                    data = json.loads(response)
+                    print(data)
+                    await broadcast_to_clients(data)
+                except Exception as e:
+                    print(f"Error receiving data: {e}")
+                    break
     except Exception as e:
-        return jsonify({"message":str(e)}),400
-    return jsonify({"message":"Trade Executed!"}),201
+        print(e)
 
 
-
-
-
-"""def calculateTotalValue():
-    my_shares = np.array([portfolio[key] for key in sorted(portfolio.keys())])
-    prices = np.array([ticker[key] for key in sorted(ticker.keys())])
-    return buyingPower+np.sum(np.multiply(my_shares, prices))
-
-def buy(n):
-    global buyingPower, totalValue, portfolio
-    cost = (n*ticker["BTC"])*(1+commission)
-    if(cost>buyingPower):
-        print("You don't have enough buying power")
+async def broadcast_to_clients(data):
+    if not connected_clients:
+        print("No clients connected")
         return
-    print("Bought "+str(n)+" shares at "+str(ticker["BTC"]))
-    buyingPower -= cost
-    portfolio["BTC"] += n
-    totalValue=calculateTotalValue()
-    print(totalValue)
+    for client in connected_clients:
+        try:
+            await client.send_json(data)
+        except Exception as e:
+            print(f"Error sending data to client: {e}")
+            connected_clients.remove(client)
 
-def sell(n):
-    global buyingPower, totalValue, portfolio
-    cost = (n*ticker["BTC"])*(1-commission)
-    if(n>portfolio["BTC"]):
-        print("You don't have enough shares")
-        return
-    print("Sold "+str(n)+" shares at "+str(ticker["BTC"]))
-    buyingPower += cost
-    portfolio["BTC"] -= n
-    totalValue=calculateTotalValue()
-    print(totalValue)
 
-sell(.5)"""
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    connected_clients.append(websocket)
+    print("Client connected")
+    print(connected_clients.__len__())
+    try:
+        while True:
+            await websocket.receive_text()  # Keep the connection alive
+    except Exception as e:
+        print(f"Client disconnected: {e}")
+    finally:
+        connected_clients.remove(websocket)
