@@ -1,5 +1,7 @@
 // src/App.js
 import Price from './Components/price.jsx';
+import SearchBar from './Components/search.jsx';
+import DropdownMenu from './Components/dropdown.jsx';
 import React, { useEffect, useState } from 'react';
 
 function App() {
@@ -34,6 +36,8 @@ function App() {
   return (
     <div className="App">
       <Price data={data} />
+      <DropdownMenu />
+      
     </div>
   );
 }
