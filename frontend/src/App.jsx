@@ -1,11 +1,13 @@
 // src/App.js
 import Price from './Components/price.jsx';
-import SearchBar from './Components/search.jsx';
 import DropdownMenu from './Components/dropdown.jsx';
 import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 
 function App() {
   const [data, setData] = useState([]);
+  const [username, setUsername] = useState('');
+  
 
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:8000/ws');
@@ -31,14 +33,18 @@ function App() {
     ws.onerror = (error) => {
       console.error("WebSocket error:", error);
     };
-  }, []); // Empty dependency array
+  }, []);
 
   return (
+    
+    <div>
+    <h1>Trading App</h1>
     <div className="App">
       <Price data={data} />
       <DropdownMenu />
       
     </div>
+  </div>
   );
 }
 
