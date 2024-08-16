@@ -1,8 +1,6 @@
 // src/App.js
 import Price from './Price.jsx';
-import DropdownMenu from './Dropdown.jsx';
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
 
 function Info() {
   const [data, setData] = useState([]);
@@ -39,7 +37,6 @@ function Info() {
     <h1>Trading App</h1>
     <div className="App">
       <Price data={data} />
-      <DropdownMenu />
     </div>
   </div>
   );

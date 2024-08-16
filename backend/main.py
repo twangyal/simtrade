@@ -7,15 +7,13 @@ from dotenv import load_dotenv
 import websockets
 from contextlib import asynccontextmanager
 
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import Session
-from pydantic import BaseModel
 from datetime import timedelta
 from databases import Database
 
 from security import get_password_hash, verify_password, create_access_token, decode_access_token, Token, TokenData, ACCESS_TOKEN_EXPIRE_MINUTES
 from models import User
 from database import Base, engine, database, Base
+from schema import UserCreate, UserLogin, BalanceResponse
 import crud
 
 
@@ -54,13 +52,6 @@ async def get_db():
     async with database.transaction():
         yield database
 
-class UserCreate(BaseModel):
-    username: str
-    password: str
-
-class UserLogin(BaseModel):
-    username: str
-    password: str
 
 # Method to receive data from the WebSocket API
 async def receive_data_from_api():
@@ -155,7 +146,7 @@ async def register(user: UserCreate, db: Database = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Username already registered")
 
     hashed_password = get_password_hash(user.password)
-    query = User.__table__.insert().values(username=user.username, hashed_password=hashed_password)
+    query = User.__table__.insert().values(username=user.username, hashed_password=hashed_password, balance=100000.0)
     await db.execute(query)
     return {"msg": "User created successfully"}
 
@@ -170,14 +161,12 @@ async def login(user: UserLogin, db: Database = Depends(get_db)):
     access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/users/me", response_model=UserCreate)
-async def read_users_me(token: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
-    query = User.__table__.select().where(User.username == token.username)
-    user = await db.fetch_one(query)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    return UserCreate(username=user["username"], password=user["hashed_password"])
 
-@app.get("/trading_records/{username}")
-async def trading_records(username: str):
-    return {"username": username, "trading_records": []}
+@app.get("/balance", response_model=BalanceResponse)
+async def read_balance(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
+    balance = await crud.get_balance(db, user.username)
+    
+    if not balance:
+        raise HTTPException(status_code=404, detail="Balance record not found")
+    
+    return BalanceResponse(current_balance=balance)

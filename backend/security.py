@@ -4,7 +4,8 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 import os
-from fastapi import HTTPException
+from fastapi import HTTPException, Header
+from typing import Optional
 
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key")
 ALGORITHM = "HS256"
@@ -35,7 +36,10 @@ def create_access_token(data: dict, expires_delta: timedelta = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def decode_access_token(token: str) -> TokenData:
+def decode_access_token(authorization: Optional[str] = Header(None)) -> TokenData:
+    if authorization is None:
+        raise HTTPException(status_code=401, detail="Authorization header missing")
+    token = authorization.replace("Bearer ", "")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
