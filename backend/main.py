@@ -66,9 +66,6 @@ class UserLogin(BaseModel):
 async def receive_data_from_api():
     global current_instrument
     global current_price
-    if connected_clients == []:
-        print("No clients connected")
-        return
     try:
         # Connect to the WebSocket API
         async with websockets.connect(WEB_SOCKET_URL) as ws:

@@ -20,3 +20,4 @@ class TradingRecord(Base):
     price = Column(Float)
     user_id = Column(Integer, ForeignKey("users.id"))
     owner = relationship("User", back_populates="trading_records")
+

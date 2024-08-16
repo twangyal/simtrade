@@ -1,16 +1,11 @@
 // src/App.js
-import Price from './Components/Price.jsx';
-import DropdownMenu from './Components/Dropdown.jsx';
-import Login from './Components/Login.jsx';
-import Dashboard from './Components/Dashboard';
-import Register from './Components/Register.jsx';
+import Price from './Price.jsx';
+import DropdownMenu from './Dropdown.jsx';
 import React, { useEffect, useState } from 'react';
-import { Route, Routes, Navigate } from 'react-router-dom';
 import axios from 'axios';
 
-function App() {
+function Info() {
   const [data, setData] = useState([]);
-  const isAuthenticated = !!localStorage.getItem('accessToken');
 
 
   useEffect(() => {
@@ -38,20 +33,6 @@ function App() {
       console.error("WebSocket error:", error);
     };
   }, []);
-
-    return (
-        <div className="App">
-            <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route
-                    path="/dashboard"
-                    element= {<Dashboard />}
-                />
-                
-            </Routes>
-        </div>
-    );
   return (
     
     <div>
@@ -59,10 +40,9 @@ function App() {
     <div className="App">
       <Price data={data} />
       <DropdownMenu />
-      <Login />
     </div>
   </div>
   );
 }
 
-export default App;
+export default Info;
