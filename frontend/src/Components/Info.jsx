@@ -1,11 +1,15 @@
 // src/App.js
 import Price from './Price.jsx';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 
-function Info() {
+function Info({instrumentSelect}) {
   const [data, setData] = useState([]);
+  const parentChange = useRef(instrumentSelect);
 
-
+  useEffect(() => {
+    parentChange.current = instrumentSelect;
+  }, [instrumentSelect]);
+  
   useEffect(() => {
     const ws = new WebSocket('ws://localhost:8000/ws');
     
@@ -17,8 +21,9 @@ function Info() {
     // On receiving data from server
     ws.onmessage = (event) => {
       const newData = JSON.parse(event.data);
-      console.log("Received data:", newData);
-      setData(newData);
+      if (newData.symbol === parentChange.current) {
+        setData(newData);
+      }
     };
     
     // On closing connection
@@ -36,7 +41,8 @@ function Info() {
     <div>
     <h1>Trading App</h1>
     <div className="App">
-      <Price data={data} />
+      <h1>Instrument: {parentChange.current}</h1>
+      <Price data={data} parentChange={parentChange.current} />
     </div>
   </div>
   );

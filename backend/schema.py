@@ -11,3 +11,7 @@ class UserLogin(BaseModel):
 
 class BalanceResponse(BaseModel):
     current_balance: float
+
+class Trade(BaseModel):
+    symbol: str
+    quantity: float
