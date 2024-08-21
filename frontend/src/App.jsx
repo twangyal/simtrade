@@ -3,15 +3,17 @@ import Trade from './Components/Trade.jsx';
 import Login from './Components/Login.jsx';
 import Dashboard from './Components/Dashboard';
 import Register from './Components/Register.jsx';
+import Lander from './Components/Lander.jsx';
 import React, { useEffect, useState } from 'react';
 import { Route, Routes, Navigate } from 'react-router-dom';
-import axios from 'axios';
+import './styles.css';
 
 function App() {
 
     return (
         <div className="App">
             <Routes>
+                <Route path="/" element={<Lander />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/dashboard" element= {<Dashboard />}/>

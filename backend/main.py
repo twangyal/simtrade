@@ -128,6 +128,7 @@ async def register(user: UserCreate, db: Database = Depends(get_db)):
     await db.execute(query)
     return {"msg": "User created successfully"}
 
+
 @app.post("/login", response_model=Token)
 async def login(user: UserLogin, db: Database = Depends(get_db)):
     query = User.__table__.select().where(User.username == user.username)
@@ -148,6 +149,19 @@ async def read_balance(user: TokenData = Depends(decode_access_token), db: Datab
         raise HTTPException(status_code=404, detail="Balance record not found")
     
     return BalanceResponse(current_balance=balance)
+
+@app.get("/username")
+async def read_user(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
+    return user.username
+
+@app.get("/portfolio")
+async def read_balance(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
+    user_record = await crud.get_user(db, user.username)
+    if not user_record:
+        raise HTTPException(status_code=404, detail="User not found")
+    user_id = user_record.id
+    return await crud.get_portfolio(db, user_id)
+
 
 @app.post("/BUY")
 async def buy_shares(trade: Trade, user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):

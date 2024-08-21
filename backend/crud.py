@@ -20,11 +20,13 @@ async def get_short_liability(db: Database, username: str):
     return None
 
 async def update_balance(db: Database, user_id: int, new_balance: float):
+    new_balance = round(new_balance, 2)
     query = User.__table__.update().where(User.id == user_id).values(balance=new_balance)
     await db.execute(query)
     return new_balance
 
 async def update_short_liability(db: Database, user_id: int, new_liability: float):
+    new_liability = round(new_liability, 2)
     query = User.__table__.update().where(User.id == user_id).values(short_liability=new_liability)
     await db.execute(query)
     return new_liability
@@ -59,6 +61,7 @@ async def add_to_portfolio(db: Database, user_id: int, symbol: str, quantity: fl
             query = Portfolio.__table__.delete().where(Portfolio.user_id == user_id, Portfolio.symbol == symbol)
         else:
             new_avg_price = (abs(existing_position.quantity) * existing_position.avg_price + abs(quantity) * price) / abs(new_quantity)
+            new_avg_price = round(new_avg_price, 4)
             query = Portfolio.__table__.update().where(Portfolio.user_id == user_id, Portfolio.symbol == symbol).values(
                 quantity=new_quantity,
                 avg_price=new_avg_price
@@ -85,3 +88,5 @@ async def get_total_quantity_by_symbol(db: Database, user_id: int, symbol: str):
     if position:
         return position.quantity
     return 0
+
+

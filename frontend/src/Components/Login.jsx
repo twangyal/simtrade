@@ -1,8 +1,6 @@
-// src/Login.js
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import './Login.css'; // Optional: Add your CSS styles
 
 const Login = () => {
     const [username, setUsername] = useState('');
@@ -49,33 +47,59 @@ const Login = () => {
     };
 
     return (
-        <div className="container">
-            <h1>Login</h1>
-            <form onSubmit={handleSubmit}>
-                <label htmlFor="username">Username:</label>
-                <input
-                    type="text"
-                    id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                />
-                <label htmlFor="password">Password:</label>
-                <input
-                    type="password"
-                    id="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                />
-                <button type="submit">Login</button>
-                {error && <p className="error-message">{error}</p>}
-                <p>Don't have an account? </p>
-                <button className="registration-button" onClick={() => navigate('/register')}>Register here</button>
-                <p>Want a Trial?</p>
-                <button className="registration-button" onClick={() => handleTrial}>Trial</button>
-            </form>
-            
+        <div className="flex items-center justify-center min-h-screen bg-gray-100">
+            <div className="bg-white shadow-md rounded-lg p-8 max-w-md w-full">
+                <h1 className="text-3xl font-bold text-center mb-6">Login</h1>
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    <div>
+                        <label htmlFor="username" className="block text-sm font-medium text-gray-700">Username:</label>
+                        <input
+                            type="text"
+                            id="username"
+                            value={username}
+                            onChange={(e) => setUsername(e.target.value)}
+                            required
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="password" className="block text-sm font-medium text-gray-700">Password:</label>
+                        <input
+                            type="password"
+                            id="password"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                        />
+                    </div>
+                    {error && <p className="text-red-500 text-sm">{error}</p>}
+                    <button
+                        type="submit"
+                        className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-300"
+                    >
+                        Login
+                    </button>
+                </form>
+                <div className="mt-6 text-center">
+                    <p className="text-sm">Don't have an account?</p>
+                    <button
+                        className="mt-2 text-blue-600 hover:underline"
+                        onClick={() => navigate('/register')}
+                    >
+                        Register here
+                    </button>
+                </div>
+                <div className="mt-4 text-center">
+                    <p className="text-sm">Want a Trial?</p>
+                    <button
+                        className="mt-2 text-blue-600 hover:underline"
+                        onClick={handleTrial}
+                    >
+                        Trial
+                    </button>
+                </div>
+            </div>
         </div>
     );
 };

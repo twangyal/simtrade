@@ -12,10 +12,23 @@ function Trade() {
     };
 
     return (
-        <div>
-            <DropdownMenu onOptionSelect={handleOptionSelect}/>
-            <Info instrumentSelect={selectedOption}/>
-            <TradeControls selectedOption={selectedOption} />
+        <div className="min-h-screen bg-gray-100 p-6 flex flex-col items-center">
+            <div className="w-full max-w-4xl bg-white shadow-lg rounded-lg p-6">
+                {/* Dropdown Menu Section */}
+                <div className="mb-6">
+                    <DropdownMenu onOptionSelect={handleOptionSelect} />
+                </div>
+
+                {/* Info Section */}
+                <div className="mb-6">
+                    <Info instrumentSelect={selectedOption} />
+                </div>
+
+                {/* Trade Controls Section */}
+                <div className="flex flex-col items-center lg:flex-row lg:justify-between lg:items-start">
+                    <TradeControls selectedOption={selectedOption} />
+                </div>
+            </div>
         </div>
     );
 }
