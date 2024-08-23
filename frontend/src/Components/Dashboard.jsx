@@ -6,16 +6,14 @@ import PerformanceGraph from './PerformanceGraph';
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const [balance, setBalance] = useState(null);
-    const [portfolio, setPortfolio] = useState([]);
     const [user, setUser] = useState(null);
+    const [balance, setBalance] = useState(null);
+    const [shortLiability, setShortLiability] = useState(null);
+    const [buyingPower, setBuyingPower] = useState(null);
+    const [netValue, setNetValue] = useState(null);
+    const [portfolio, setPortfolio] = useState([]);
     const [error, setError] = useState(null);
     const [sidebarOpen, setSidebarOpen] = useState(false);
-
-    const handleLogout = () => {
-        localStorage.removeItem('accessToken');
-        navigate('/login');
-    };
 
     const toggleSidebar = () => {
         setSidebarOpen(!sidebarOpen);
@@ -29,25 +27,19 @@ const Dashboard = () => {
                 return;
             }
             try {
-                const response = await axios.get('http://localhost:8000/username', {
+                // Fetch user data
+                const response = await axios.get('http://localhost:8000/user_data', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
                 });
-                setUser(response.data);
+                setUser(response.data.username);
+                setBalance(response.data.balance);
+                setShortLiability(response.data.short_liability);
+                setNetValue(response.data.networth);
+                console.log(response.data);
             } catch (error) {
-                setError('Error fetching username');
-                console.error(error);
-            }
-            try {
-                const response = await axios.get('http://localhost:8000/balance', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                setBalance(response.data.current_balance);
-            } catch (error) {
-                setError('Error fetching balance');
+                setError('Error fetching user data');
                 console.error(error);
             }
             try {
@@ -93,11 +85,11 @@ const Dashboard = () => {
                     </div>
                     <div className="bg-white p-6 rounded-lg shadow-md">
                         <h2 className="text-lg font-semibold">Short Liability</h2>
-                        <p className="text-2xl font-bold">$10,000</p>
+                        <p className="text-2xl font-bold">${shortLiability || 'N/A'}</p>
                     </div>
                     <div className="bg-white p-6 rounded-lg shadow-md">
                         <h2 className="text-lg font-semibold">Portfolio Value</h2>
-                        <p className="text-2xl font-bold">$140,000</p>
+                        <p className="text-2xl font-bold">${netValue || 'N/A'}</p>
                     </div>
                 </div>
 
@@ -121,7 +113,7 @@ const Dashboard = () => {
                                         <td className="border-t px-6 py-4">{item.quantity}</td>
                                         <td className="border-t px-6 py-4">${item.avg_price.toFixed(2)}</td>
                                         <td className="border-t px-6 py-4">
-                                            ${(item.quantity * item.avg_price).toFixed(2)}
+                                            ${(item.quantity * item.current_price).toFixed(2)}
                                         </td>
                                     </tr>
                                 ))
@@ -137,24 +129,6 @@ const Dashboard = () => {
                 {/* Performance Graph Section */}
                 <PerformanceGraph />
             </div>
-        </div>
-    );
-
-    return (
-        <div>
-            <h1>Welcome to your Dashboard</h1>
-            <div>
-                <h1>Dashboard</h1>
-                {error && <p>{error}</p>}
-                {balance !== null ? (
-                    <p>Your current balance is: ${balance.toFixed(2)}</p>
-                ) : (
-                    <p>Loading balance...</p>
-                )}
-            </div>
-            <button onClick={() => navigate('/trade')}>Trade</button>
-            <p></p>
-            <button onClick={handleLogout}>Logout</button>
         </div>
     );
 };

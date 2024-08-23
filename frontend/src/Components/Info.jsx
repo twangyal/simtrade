@@ -36,6 +36,10 @@ function Info({instrumentSelect}) {
     ws.onerror = (error) => {
       console.error("WebSocket error:", error);
     };
+
+    return () => {
+      ws.close();
+    };
   }, []);
   const graphOptions = {
     title: {

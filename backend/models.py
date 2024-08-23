@@ -9,6 +9,7 @@ class User(Base):
     username = Column(String, unique=True, index=True)
     balance = Column(Float, default=10000.0)
     short_liability = Column(Float, default=0.0)
+    networth = Column(Float, default=10000.0)
     hashed_password = Column(String)
     trades = relationship("Trade", back_populates="user", cascade="all, delete-orphan")
     portfolio = relationship("Portfolio", back_populates="user", cascade="all, delete-orphan")
@@ -36,6 +37,7 @@ class Portfolio(Base):
     symbol = Column(String)
     quantity = Column(Float)  # Positive for long positions, negative for short positions
     avg_price = Column(Float)  # Average price paid for the current position
+    current_price = Column(Float)  # Current price of the stock
 
     user = relationship("User", back_populates="portfolio")
 
