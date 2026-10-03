@@ -8,7 +8,9 @@ import os
 
 from databases import Database
 from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from database import Base, database, engine
 from demo import DemoFeed, demo_quotes
@@ -93,6 +95,26 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title='SimTrade API', lifespan=lifespan)
+
+
+@app.exception_handler(RequestValidationError)
+async def request_validation_error_handler(_request, exc):
+    # Rejected input can contain passwords, non-finite numbers or invalid Unicode.
+    # Return validation metadata without reflecting that input into the response.
+    details = []
+    for error in exc.errors():
+        detail = {key: error[key] for key in ('loc', 'msg', 'type')}
+        context = {
+            key: value for key, value in error.get('ctx', {}).items()
+            if value is None or isinstance(value, (str, int))
+            or (isinstance(value, float) and math.isfinite(value))
+        }
+        if context:
+            detail['ctx'] = context
+        details.append(detail)
+    return JSONResponse(status_code=422, content={'detail': details})
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[origin.strip() for origin in os.getenv(
