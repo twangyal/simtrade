@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { quoteRangeStats, selectQuoteRange } from '../quotes';
 import { formatQuotePrice, formatReceiptTime } from '../quoteFormat';
+import { quoteAxis, formatAxisPrice } from '../quoteAxis';
 import './MarketQuoteChart.css';
 
 const HEIGHT = 320;
@@ -12,9 +13,8 @@ const RIGHT = 88;
 
 function geometry(points, width, stats) {
   if (!stats) return null;
-  const padding = stats.high === stats.low ? Math.max(stats.high * 0.001, Number.EPSILON) : (stats.high - stats.low) * 0.18;
-  const low = Math.max(0, stats.low - padding);
-  const high = stats.high + padding;
+  const axis = quoteAxis(stats.low, stats.high);
+  const { low, high } = axis;
   const firstTime = points[0].time;
   const duration = points.at(-1).time - firstTime;
   const right = width - RIGHT;
@@ -25,8 +25,8 @@ function geometry(points, width, stats) {
   const plotted = points.map(position);
   const line = plotted.map(({ x, y }, index) => `${index ? 'L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
   const area = `${line} L${plotted.at(-1).x.toFixed(2)},${BOTTOM} L${plotted[0].x.toFixed(2)},${BOTTOM} Z`;
-  const grid = Array.from({ length: 5 }, (_, index) => ({
-    y: TOP + (index / 4) * (BOTTOM - TOP), price: high - (index / 4) * (high - low),
+  const grid = [...axis.ticks].reverse().map((price, index) => ({
+    y: TOP + (index / (axis.ticks.length - 1)) * (BOTTOM - TOP), label: formatAxisPrice(price, axis.step),
   }));
   return { plotted, line, area, grid, right };
 }
@@ -109,7 +109,7 @@ export default function MarketQuoteChart({ points, symbol }) {
           {(shape?.grid ?? Array.from({ length: 5 }, (_, index) => ({ y: TOP + (index / 4) * (BOTTOM - TOP) }))).map((row, index) => (
             <g key={index}>
               <line className="market-chart-gridline" x1={LEFT} y1={row.y} x2={width - RIGHT} y2={row.y} />
-              {row.price !== undefined && <text className="market-chart-axis" x={width - RIGHT + 14} y={row.y + 4}>{formatQuotePrice(row.price)}</text>}
+              {row.label !== undefined && <text className="market-chart-axis" x={width - RIGHT + 14} y={row.y + 4}>{row.label}</text>}
             </g>
           ))}
           {shape && measured && <>
