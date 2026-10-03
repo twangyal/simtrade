@@ -8,6 +8,7 @@ import TradeHistory from './Components/TradeHistory.jsx';
 import { Route, Routes } from 'react-router-dom';
 import './styles.css';
 import RequireSession from './Components/RequireSession';
+import TradePageBoundary from './Components/TradePageBoundary';
 
 const Trade = lazy(() => import('./Components/Trade.jsx'));
 
@@ -22,9 +23,11 @@ function App() {
                 <Route element={<RequireSession />}>
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/trade" element={
-                        <Suspense fallback={<p role="status" className="min-h-screen bg-gray-100 p-6">Loading trading page…</p>}>
-                            <Trade />
-                        </Suspense>
+                        <TradePageBoundary>
+                            <Suspense fallback={<p role="status" className="min-h-screen bg-gray-100 p-6">Loading trading page…</p>}>
+                                <Trade />
+                            </Suspense>
+                        </TradePageBoundary>
                     } />
                     <Route path="/trade-history" element={<TradeHistory />} />
                 </Route>
