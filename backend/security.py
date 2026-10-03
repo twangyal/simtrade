@@ -5,11 +5,11 @@ from pathlib import Path
 import re
 from typing import Optional
 
+import bcrypt
 from dotenv import load_dotenv
 from fastapi import HTTPException, Header
 import jwt
 from pydantic import BaseModel
-from passlib.context import CryptContext
 
 load_dotenv(Path(__file__).with_name("api.env"), override=False)
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -22,9 +22,7 @@ BEARER_HEADER = re.compile(
     r"Bearer +([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)",
     flags=re.IGNORECASE | re.ASCII,
 )
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+BCRYPT_HASH = re.compile(r"\$2[aby]\$(?:0[4-9]|[12][0-9]|3[01])\$[./A-Za-z0-9]{53}")
 
 class Token(BaseModel):
     access_token: str
@@ -35,10 +33,23 @@ class TokenData(BaseModel):
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return pwd_context.verify(plain_password, hashed_password)
+    if not isinstance(plain_password, str) or not isinstance(hashed_password, str):
+        return False
+    if BCRYPT_HASH.fullmatch(hashed_password) is None:
+        return False
+    try:
+        password = plain_password.encode("utf-8")
+        if len(password) > 72:
+            return False
+        return bcrypt.checkpw(password, hashed_password.encode("ascii"))
+    except (ValueError, TypeError, UnicodeError):
+        return False
 
 def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+    encoded = password.encode("utf-8")
+    if len(encoded) > 72:
+        raise ValueError("Password must be at most 72 UTF-8 bytes")
+    return bcrypt.hashpw(encoded, bcrypt.gensalt(rounds=12)).decode("ascii")
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):

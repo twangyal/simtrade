@@ -18,8 +18,8 @@ from fastapi import HTTPException
 
 
 SECURITY_SOURCE = Path(__file__).resolve().parents[1] / "security.py"
-TEST_SECRET = "test-only-signing-key-9e373c4be674a2f508a7"
-OTHER_SECRET = "another-test-only-signing-key-0d6a39bc567e"
+TEST_SECRET = "test-only-signing-key-9e373c4be674a2f508a7-with-extra-test-entropy"
+OTHER_SECRET = "another-test-only-signing-key-0d6a39bc567e-with-extra-test-entropy"
 
 
 class ConfigurationTests(unittest.TestCase):
@@ -200,6 +200,34 @@ class TokenTests(unittest.TestCase):
         self.assertTrue(password_hash.startswith("$2"))
         self.assertTrue(self.security.verify_password("test-only-password", password_hash))
         self.assertFalse(self.security.verify_password("incorrect-password", password_hash))
+
+    def test_existing_passlib_bcrypt_hashes_remain_valid(self):
+        # Fixed synthetic hash generated with Passlib before its removal.
+        legacy_hash = "$2b$12$abcdefghijklmnopqrstuu/WYNrRb1FEPlWDRZSh17g1.o8TXrECK"
+        for prefix in ("$2b$", "$2a$", "$2y$"):
+            with self.subTest(prefix=prefix):
+                self.assertTrue(self.security.verify_password(
+                    "legacy-test-password", prefix + legacy_hash[4:]
+                ))
+                self.assertFalse(self.security.verify_password(
+                    "wrong-password", prefix + legacy_hash[4:]
+                ))
+
+    def test_malformed_stored_password_hashes_fail_closed(self):
+        for password_hash in (None, "", "invalid", "$2b$12$invalid", "$2b$12$\N{SNOWMAN}"):
+            with self.subTest(password_hash=password_hash):
+                self.assertFalse(self.security.verify_password("test-password", password_hash))
+
+    def test_password_hashing_rejects_bcrypt_truncation(self):
+        for password in ("a" * 73, "\N{LATIN SMALL LETTER E WITH ACUTE}" * 37):
+            with self.subTest(encoded_length=len(password.encode("utf-8"))):
+                with self.assertRaises(ValueError):
+                    self.security.get_password_hash(password)
+
+    def test_password_verification_rejects_bcrypt_truncation(self):
+        password_hash = self.security.get_password_hash("a" * 72)
+        self.assertTrue(self.security.verify_password("a" * 72, password_hash))
+        self.assertFalse(self.security.verify_password("a" * 73, password_hash))
 
 
 if __name__ == "__main__":
