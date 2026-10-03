@@ -6,7 +6,7 @@ import './PortfolioExposure.css';
 
 const COLORS = ['#087f6a', '#6c91ae', '#c59a52', '#9784b7', '#8fb7a3', '#5e7b88', '#bc8d89', '#b2b580'];
 const compactMoney = new Intl.NumberFormat('en-US', {
-  style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1,
+  style: 'currency', currency: 'USD', notation: 'compact', minimumFractionDigits: 0, maximumFractionDigits: 1,
 });
 const percent = (value) => value > 0 && value < 0.1 ? '<0.1%' : `${Number(value.toFixed(1))}%`;
 
