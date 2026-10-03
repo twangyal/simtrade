@@ -48,12 +48,13 @@ const TradeHistory = () => {
                 onClick={() => setSidebarOpen(true)}>&#9776;</button>
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-3xl font-bold mb-6">Trade History</h1>
+                <p className="text-sm text-gray-600 mb-4">Notional is quantity times execution price. Cash debits for buys round up to cents; credits for sells round down.</p>
                 {error && <p role="alert" className="text-red-600 mb-4">{error}</p>}
                 {loading && <p role="status" className="mb-4">Loading trade history…</p>}
                 <div className="bg-white p-6 rounded-lg shadow-md overflow-x-auto">
                     <table className="min-w-full bg-white">
                         <thead><tr>
-                            {['Date', 'Side', 'Symbol', 'Quantity', 'Price', 'Total'].map((heading) =>
+                            {['Date', 'Side', 'Symbol', 'Quantity', 'Price', 'Notional'].map((heading) =>
                                 <th key={heading} scope="col" className="py-2">{heading}</th>)}
                         </tr></thead>
                         <tbody>

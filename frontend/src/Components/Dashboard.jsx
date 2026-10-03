@@ -91,7 +91,7 @@ const Dashboard = () => {
                         </tbody>
                     </table>
                 </div>
-                <p className="text-sm text-gray-600">Unrealized P&L uses average entry prices and the last known quote. It excludes realized gains and losses.</p>
+                <p className="text-sm text-gray-600">Unrealized P&L uses average entry prices and the last known quote. It excludes realized gains, losses, and cash rounding.</p>
             </div>
         </div>
     );
