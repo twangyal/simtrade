@@ -1,0 +1,90 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: simtrade
+          POSTGRES_PASSWORD: test-only-simtrade
+          POSTGRES_DB: simtrade_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U simtrade -d simtrade_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/dependencies.txt
+            backend/test-dependencies.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/dependencies.txt -r backend/test-dependencies.txt
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Test backend
+        run: python -m unittest discover -s backend/tests
+        env:
+          PYTHONPATH: backend
+          PYTHONDONTWRITEBYTECODE: "1"
+          SIMTRADE_TEST_POSTGRES_URL: postgresql://simtrade:test-only-simtrade@localhost:5432/simtrade_test
+
+      - name: Test frontend
+        run: npm test
+        working-directory: frontend
+
+      - name: Lint frontend
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
+
+      - name: Verify demo trading in sandboxed Chrome
+        run: npm run test:e2e
+        working-directory: frontend
+        timeout-minutes: 5
+        env:
+          SIMTRADE_TEST_POSTGRES_URL: postgresql://simtrade:test-only-simtrade@localhost:5432/simtrade_test
+          SIMTRADE_TEST_PYTHON: python
+
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: browser-screenshots
+          path: |
+            frontend/test-results/**/*.png
+            frontend/test-results/**/*-accessibility.json
+          if-no-files-found: ignore
+          retention-days: 7

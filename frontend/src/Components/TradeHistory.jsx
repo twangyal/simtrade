@@ -1,129 +1,69 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import Sidebar from './Sidebar';
+import { useEffect, useState } from 'react';
+import api, { authHeaders, errorMessage, formatMoney } from '../api';
+import AppShell from './AppShell';
+import Icon from './Icon';
+import TableRegion from './TableRegion';
+import { formatUnitPrice } from '../unitPrice';
+import { tradeNotional } from '../portfolio';
+import { Link } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 10;
 
 const TradeHistory = () => {
     const [trades, setTrades] = useState([]);
     const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-    const [error, setError] = useState(null);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-
-    const toggleSidebar = () => {
-        setSidebarOpen(!sidebarOpen);
-    };
+    const [totalPages, setTotalPages] = useState(0);
+    const [error, setError] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [revision, setRevision] = useState(0);
 
     useEffect(() => {
+        const controller = new AbortController();
+        setLoading(true);
+        setError('');
+        setTrades([]);
         const fetchTrades = async () => {
             try {
-                const token = localStorage.getItem('accessToken');
-                if (!token) {
-                    setError('User not authenticated');
+                const response = await api.get(`/trades?page=${currentPage}&limit=${ITEMS_PER_PAGE}`, {
+                    headers: authHeaders(), signal: controller.signal,
+                });
+                if (controller.signal.aborted) return;
+                const pages = Math.max(0, response.data.totalPages);
+                setTotalPages(pages);
+                if (currentPage > Math.max(1, pages)) {
+                    setCurrentPage(Math.max(1, pages));
                     return;
                 }
-                const response = await axios.get(`http://localhost:8000/trades?page=${currentPage}&limit=${ITEMS_PER_PAGE}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
                 setTrades(response.data.trades);
-                setTotalPages(response.data.totalPages); // Assuming API returns total pages info
             } catch (error) {
-                setError('Error fetching trade history');
-                console.error(error);
+                if (!controller.signal.aborted) setError(errorMessage(error, 'Unable to load trade history.'));
+            } finally {
+                if (!controller.signal.aborted) setLoading(false);
             }
         };
-
         fetchTrades();
-        console.log('Trades:', trades);
-    }, [currentPage]);
+        return () => controller.abort();
+    }, [currentPage, revision]);
 
-    const handlePageChange = (page) => {
-        if (page > 0 && page <= totalPages) {
-            setCurrentPage(page);
-        }
-    };
-    
-    const formatDate = (date) => {
-        const options = { year: 'numeric', month: 'long', day: 'numeric' };
-        return new Date(date).toLocaleDateString('en-US', options);
-    }
-
-
-    return (
-        <div className="min-h-screen bg-gray-100 p-6 relative">
-        {/* Sidebar */}
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-        {/* Sidebar Toggle Button */}
-        <button 
-            className={`fixed top-4 right-4 text-2xl text-gray-600 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'opacity-0' : 'opacity-100'}`} 
-            onClick={toggleSidebar}
-        >
-            &#9776;
-        </button>
-
-        <div className="min-h-screen bg-gray-100 p-6">
-            <div className="max-w-7xl mx-auto">
-                <h1 className="text-3xl font-bold mb-6">Trade History</h1>
-                {error && <p className="text-red-500 mb-4">{error}</p>}
-                <div className="bg-white p-6 rounded-lg shadow-md">
-                    <table className="min-w-full bg-white">
-                        <thead>
-                            <tr>
-                                <th className="py-2">Date</th>
-                                <th className="py-2">Symbol</th>
-                                <th className="py-2">Quantity</th>
-                                <th className="py-2">Price</th>
-                                <th className="py-2">Total</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {trades.length > 0 ? (
-                                trades.map((trade) => (
-                                    <tr key={trade.id}>
-                                        <td className="border-t px-6 py-4">{formatDate(trade.timestamp)}</td>
-                                        <td className="border-t px-6 py-4">{trade.symbol}</td>
-                                        <td className="border-t px-6 py-4">{trade.quantity}</td>
-                                        <td className="border-t px-6 py-4">${trade.price}</td>
-                                        <td className="border-t px-6 py-4">${(trade.quantity * trade.price)}</td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="5" className="border-t px-6 py-4 text-center">No trades available</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Pagination Controls */}
-                <div className="flex justify-between items-center mt-6">
-                    <button
-                        className={`bg-blue-500 text-white px-4 py-2 rounded-lg ${currentPage <= 1 ? 'invisible' : ''}`}
-                        onClick={() => handlePageChange(currentPage - 1)}
-                        disabled={currentPage <= 1}
-                    >
-                        Previous
-                    </button>
-                    <span className="text-lg">
-                        Page {currentPage} of {totalPages}
-                    </span>
-                    <button
-                        className={`bg-blue-500 text-white px-4 py-2 rounded-lg ${currentPage >= totalPages ? 'invisible' : ''}`}
-                        onClick={() => handlePageChange(currentPage + 1)}
-                        disabled={currentPage >= totalPages}
-                    >
-                        Next
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
-    );
+    return <AppShell section="Activity">
+        <div className="page-heading"><div><p className="eyebrow">EVERY MOVE TELLS A STORY</p><h1>Trade History</h1><p className="page-description">Your decisions, in order. Review the trades that shape your portfolio.</p></div><Link className="button button-primary" to="/trade">New trade<Icon name="arrow" size={18} /></Link></div>
+        <section className="panel history-panel" aria-labelledby="activity-title">
+            <div className="panel-heading"><div><p className="eyebrow">YOUR TRADING JOURNAL</p><h2 id="activity-title">Recent activity</h2></div><button className="text-button" aria-label="Refresh trade history" disabled={loading} onClick={() => setRevision((value) => value + 1)}><Icon name="refresh" size={15} />Refresh</button></div>
+            {error && <p role="alert" className="notice notice-error history-notice">{error}</p>}
+            {loading && <p role="status" className="loading-message history-notice">Loading trade history…</p>}
+            <TableRegion label="Trade records">
+                <table className="data-table history-table"><thead><tr>
+                    {['Date', 'Side', 'Symbol', 'Quantity', 'Price', 'Notional'].map((heading) => <th key={heading} scope="col">{heading}</th>)}
+                </tr></thead><tbody>{trades.map((trade) => <tr key={trade.id}>
+                    <td><time dateTime={trade.timestamp}>{new Date(trade.timestamp).toLocaleString()}</time></td>
+                    <td><span className={`side-badge ${trade.quantity < 0 ? 'side-sell' : 'side-buy'}`}>{trade.quantity < 0 ? 'Sell' : 'Buy'}</span></td>
+                    <td><strong>{trade.symbol}</strong></td><td>{Math.abs(trade.quantity)}</td><td>{formatUnitPrice(trade.price)}</td><td>{formatMoney(tradeNotional(trade.quantity, trade.price))}</td>
+                </tr>)}</tbody></table>
+            </TableRegion>
+            {!loading && !error && !trades.length && <div className="empty-state history-empty"><span className="empty-state-icon"><Icon name="history" size={28} /></span><h3>No trades available</h3><p>Your first trade is the beginning of your story.<br />When you make a move, it will appear here.</p><Link className="button button-secondary" to="/trade">Explore instruments<Icon name="arrow" size={16} /></Link></div>}
+            <div className="pagination"><button className="button button-quiet" onClick={() => setCurrentPage((page) => page - 1)} disabled={loading || currentPage <= 1}>Previous</button><span>{totalPages > 0 ? `Page ${currentPage} of ${totalPages}` : 'No pages'}</span><button className="button button-quiet" onClick={() => setCurrentPage((page) => page + 1)} disabled={loading || currentPage >= totalPages}>Next</button></div>
+        </section>
+        <p className="page-footnote">Notional is quantity times execution price. Cash debits for buys round up to cents; credits for sells round down. Times are shown in your local timezone.</p>
+    </AppShell>;
 };
-
 export default TradeHistory;

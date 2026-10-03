@@ -1,137 +1,109 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import Sidebar from './Sidebar';
-import PerformanceGraph from './PerformanceGraph';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import api, { authHeaders, errorMessage, formatMoney } from '../api';
+import { portfolioGain, positionGain, positionValue } from '../portfolio';
+import { instrumentDetails } from '../instruments';
+import AppShell from './AppShell';
+import Icon from './Icon';
+import MarketStatus from './MarketStatus';
+import PortfolioExposure from './PortfolioExposure';
+import TableRegion from './TableRegion';
+import { formatUnitPrice } from '../unitPrice';
 
 const Dashboard = () => {
-    const navigate = useNavigate();
-    const [user, setUser] = useState(null);
-    const [balance, setBalance] = useState(null);
-    const [shortLiability, setShortLiability] = useState(null);
-    const [buyingPower, setBuyingPower] = useState(null);
-    const [netValue, setNetValue] = useState(null);
+    const [account, setAccount] = useState(null);
     const [portfolio, setPortfolio] = useState([]);
-    const [error, setError] = useState(null);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-
-    const toggleSidebar = () => {
-        setSidebarOpen(!sidebarOpen);
-    };
+    const [portfolioReady, setPortfolioReady] = useState(false);
+    const [errors, setErrors] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [revision, setRevision] = useState(0);
+    const [updatedAt, setUpdatedAt] = useState(null);
 
     useEffect(() => {
+        const controller = new AbortController();
+        setLoading(true);
+        setErrors([]);
         const fetchData = async () => {
-            const token = localStorage.getItem('accessToken');
-            if (!token) {
-                setError('User not authenticated');
-                return;
-            }
             try {
-                // Fetch user data
-                const response = await axios.get('http://localhost:8000/user_data', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                setUser(response.data.username);
-                setBalance(response.data.balance);
-                setShortLiability(response.data.short_liability);
-                setNetValue(response.data.networth);
-                console.log(response.data);
+                const options = { headers: authHeaders(), signal: controller.signal };
+                const results = await Promise.allSettled([
+                    api.get('/user_data', options), api.get('/portfolio', options),
+                ]);
+                if (controller.signal.aborted) return;
+                const failures = [];
+                if (results[0].status === 'fulfilled') setAccount(results[0].value.data);
+                else { setAccount(null); failures.push(errorMessage(results[0].reason, 'Unable to load account data.')); }
+                if (results[1].status === 'fulfilled') {
+                    setPortfolio(results[1].value.data);
+                    setPortfolioReady(true);
+                } else {
+                    setPortfolio([]);
+                    setPortfolioReady(false);
+                    failures.push(errorMessage(results[1].reason, 'Unable to load portfolio.'));
+                }
+                setUpdatedAt(failures.length ? null : new Date());
+                setErrors([...new Set(failures)]);
             } catch (error) {
-                setError('Error fetching user data');
-                console.error(error);
-            }
-            try {
-                const response = await axios.get('http://localhost:8000/portfolio', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                setPortfolio(response.data);
-            } catch (error) {
-                setError('Error fetching portfolio');
-                console.error(error);
+                if (!controller.signal.aborted) setErrors([errorMessage(error, 'Unable to load your account.')]);
+            } finally {
+                if (!controller.signal.aborted) setLoading(false);
             }
         };
         fetchData();
-    }, []);
+        return () => controller.abort();
+    }, [revision]);
 
-    return (
-        <div className="min-h-screen bg-gray-100 p-6 relative">
-            {/* Sidebar */}
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            {/* Sidebar Toggle Button */}
-            <button 
-                className={`fixed top-4 right-4 text-2xl text-gray-600 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'opacity-0' : 'opacity-100'}`} 
-                onClick={toggleSidebar}
-            >
-                &#9776;
-            </button>
-
-            <div className="max-w-7xl mx-auto">
-                <h1 className="text-3xl font-bold mb-6">Welcome, {user}</h1>
-
-                {/* Overview Section */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <h2 className="text-lg font-semibold">Buying Power</h2>
-                        <p className="text-2xl font-bold">${balance || 'N/A'}</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <h2 className="text-lg font-semibold">Credit</h2>
-                        <p className="text-2xl font-bold">$50,000</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <h2 className="text-lg font-semibold">Short Liability</h2>
-                        <p className="text-2xl font-bold">${shortLiability || 'N/A'}</p>
-                    </div>
-                    <div className="bg-white p-6 rounded-lg shadow-md">
-                        <h2 className="text-lg font-semibold">Portfolio Value</h2>
-                        <p className="text-2xl font-bold">${netValue || 'N/A'}</p>
-                    </div>
-                </div>
-
-                {/* Portfolio Section */}
-                <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-                    <h2 className="text-lg font-semibold mb-4">Portfolio</h2>
-                    <table className="min-w-full bg-white">
-                        <thead>
-                            <tr>
-                                <th className="py-2">Asset</th>
-                                <th className="py-2">Quantity</th>
-                                <th className="py-2">Average Price</th>
-                                <th className="py-2">Total Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {portfolio.length > 0 ? (
-                                portfolio.map((item) => (
-                                    <tr key={item.id}>
-                                        <td className="border-t px-6 py-4">{item.symbol}</td>
-                                        <td className="border-t px-6 py-4">{item.quantity}</td>
-                                        <td className="border-t px-6 py-4">${item.avg_price.toFixed(2)}</td>
-                                        <td className="border-t px-6 py-4">
-                                            ${(item.quantity * item.current_price).toFixed(2)}
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan="4" className="border-t px-6 py-4 text-center">No assets in portfolio</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                {/* Performance Graph Section */}
-                <PerformanceGraph />
-            </div>
+    const unrealized = portfolioReady ? portfolioGain(portfolio) : null;
+    const metrics = [
+        ['Net Account Value', account?.networth, 'Cash + signed position value', 'layers'],
+        ['Cash Balance', account?.balance, 'Simulated funds available', 'wallet'],
+        ['Unrealized P&L', unrealized, 'Open positions · last known marks', 'chart'],
+        ['Short Liability', account?.short_liability, 'Value of open short positions', 'down'],
+    ];
+    const wideMetrics = metrics.some(([, value]) => formatMoney(value).length > 11);
+    return <AppShell section="Overview">
+        <div className="page-heading">
+            <div><p className="eyebrow">YOUR NEXT CHAPTER STARTS HERE</p><h1>{account ? `Welcome, ${account.username}` : 'Dashboard'}</h1><p className="page-description">A clear view of your portfolio. A little more perspective for your next move.</p></div>
+            <Link className="button button-primary" to="/trade">Explore markets<Icon name="arrow" size={18} /></Link>
         </div>
-    );
+        <MarketStatus />
+        <div className="section-toolbar"><div><span className="section-label">Account snapshot</span><span className="snapshot-time">{updatedAt ? `Updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Values in USD'}</span></div><button className="text-button" aria-label="Refresh account" disabled={loading} onClick={() => setRevision((value) => value + 1)}><Icon name="refresh" size={15} />{loading ? 'Refreshing' : 'Refresh'}</button></div>
+        {loading && <p role="status" className="loading-message">Loading your account…</p>}
+        {errors.map((error) => <p key={error} role="alert" className="notice notice-error">{error}</p>)}
+        <div className={`metrics-grid${wideMetrics ? ' metrics-grid--wide-values' : ''}`} aria-busy={loading}>
+            {metrics.map(([label, value, caption, icon], index) => {
+                const formattedValue = formatMoney(value);
+                return <section key={label} className={`metric-card${index === 0 ? ' metric-featured' : ''}`}>
+                    <h2>{label}</h2><span className="metric-icon"><Icon name={icon} size={18} /></span>
+                    <p className={`metric-value${formattedValue.length > 13 ? ' metric-value-long' : ''}${label === 'Unrealized P&L' && value != null ? value < 0 ? ' value-negative' : value > 0 ? ' value-positive' : '' : ''}`}>{formattedValue}</p>
+                    <p className="metric-caption">{caption}</p>
+                </section>;
+            })}
+        </div>
+        {account?.valuation_estimated && <p className="notice notice-warning">Net account value includes estimates at entry prices where a market quote is unavailable.</p>}
+        <div className="portfolio-grid">
+            <section className="panel holdings-panel" aria-labelledby="holdings-title">
+                <div className="panel-heading"><div><p className="eyebrow">WHAT YOU HOLD</p><h2 id="holdings-title">Portfolio</h2></div><span className="count-badge">{portfolioReady ? `${portfolio.length} position${portfolio.length === 1 ? '' : 's'}` : '—'}</span></div>
+                <TableRegion label="Portfolio holdings">
+                    <table className="data-table holdings-table">
+                        <thead><tr>{['Asset', 'Quantity', 'Average Price', 'Total Value', 'Unrealized P&L'].map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead>
+                        <tbody>{portfolio.map((item) => {
+                            const instrument = instrumentDetails(item.symbol);
+                            const gain = positionGain(item);
+                            return <tr key={item.id ?? item.symbol}>
+                                <td><Link className="asset-cell" to={`/trade?symbol=${encodeURIComponent(item.symbol)}`} aria-label={`Trade ${item.symbol}`}><span className={`asset-badge asset-${instrument.category.toLowerCase()}`} aria-hidden="true">{instrument.badge}</span><span><strong>{item.symbol}</strong><small>{item.quantity < 0 ? 'Short' : 'Long'} position</small></span></Link></td>
+                                <td>{item.quantity}</td><td>{formatUnitPrice(item.avg_price)}</td><td>{formatMoney(positionValue(item))}</td><td className={gain == null || gain === 0 ? '' : gain < 0 ? 'value-negative' : 'value-positive'}>{formatMoney(gain)}</td>
+                            </tr>;
+                        })}</tbody>
+                    </table>
+                </TableRegion>
+                {!loading && portfolioReady && !portfolio.length && <div className="empty-state"><span className="empty-state-icon"><Icon name="layers" size={28} /></span><h3>No assets in portfolio</h3><p>Every portfolio starts with a first idea.<br />Find an instrument and make it yours.</p><Link className="button button-secondary" to="/trade">Make your first trade<Icon name="arrow" size={16} /></Link></div>}
+                {!loading && !portfolioReady && <div className="empty-state"><Icon name="refresh" size={24} /><h3>Your holdings could not load</h3><p>Refresh your account to try again.</p></div>}
+                <div className="panel-footnote">Unrealized P&L uses average entry prices and the last known quote. It excludes realized gains, losses, and cash rounding.</div>
+            </section>
+            <PortfolioExposure holdings={portfolio} loading={loading} unavailable={!loading && !portfolioReady} />
+        </div>
+        <div className="learning-banner"><span className="learning-icon"><Icon name="shield" size={25} /></span><div><strong>Room to experiment. Space to learn.</strong><p>Your balance is virtual. Use it to explore position sizes, compare instruments, and develop your approach.</p></div><Link className="text-button" to="/trade-history">Review activity<Icon name="arrow" size={17} /></Link></div>
+    </AppShell>;
 };
-
-
 export default Dashboard;

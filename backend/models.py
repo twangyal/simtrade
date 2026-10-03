@@ -1,15 +1,18 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
-from datetime import datetime
+from datetime import datetime, timezone
+
+STARTING_BALANCE = 100000.0
+
 
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
-    balance = Column(Float, default=10000.0)
+    balance = Column(Float, default=STARTING_BALANCE)
     short_liability = Column(Float, default=0.0)
-    networth = Column(Float, default=10000.0)
+    networth = Column(Float, default=STARTING_BALANCE)
     hashed_password = Column(String)
     trades = relationship("Trade", back_populates="user", cascade="all, delete-orphan")
     portfolio = relationship("Portfolio", back_populates="user", cascade="all, delete-orphan")
@@ -25,7 +28,7 @@ class Trade(Base):
     quantity = Column(Float)  # Negative for sell/short trades
     price = Column(Float)
     trade_type = Column(String)  # "BUY", "SELL", "SELL (SHORT)", "COVER"
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     user = relationship("User", back_populates="trades")
 
@@ -42,4 +45,19 @@ class Portfolio(Base):
     user = relationship("User", back_populates="portfolio")
 
 
+class OrderReceipt(Base):
+    """A completed order's replay record, committed in the fill transaction."""
+
+    __tablename__ = "order_receipts"
+    __table_args__ = (
+        UniqueConstraint("user_id", "client_order_id", name="uq_order_receipt_user_client_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    client_order_id = Column(String(36), nullable=False)
+    side = Column(String(4), nullable=False)
+    symbol = Column(String(20), nullable=False)
+    quantity = Column(String(32), nullable=False)
+    response = Column(JSON, nullable=False)
 

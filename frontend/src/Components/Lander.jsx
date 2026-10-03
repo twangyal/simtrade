@@ -1,4 +1,3 @@
-import React from 'react';
 import Header from './LanderComponents/Header';
 import Hero from './LanderComponents/Hero';
 import Features from './LanderComponents/Features';
@@ -9,13 +8,16 @@ import './Lander.css';
 
 function Lander() {
     return (
-        <div className="Lander">
-        <Header />
-        <Hero />
-        <Features />
-        <HowItWorks />
-        <FAQ />
-        <Footer />
+        <div className="public-site">
+            <a className="public-skip-link" href="#public-main">Skip to content</a>
+            <Header />
+            <main id="public-main">
+                <Hero />
+                <Features />
+                <HowItWorks />
+                <FAQ />
+            </main>
+            <Footer />
         </div>
     );
 }

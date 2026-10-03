@@ -1,27 +1,15 @@
-import React from 'react';
-
-function FAQ() {
+function Faq() {
     return (
-        <section id="faq" className="py-20 bg-gray-100">
-        <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold">Frequently Asked Questions</h2>
-        </div>
-        <div className="space-y-8 max-w-4xl mx-auto">
-            <div className="faq-item">
-            <h4 className="text-xl font-semibold mb-2">What is a paper trading simulator?</h4>
-            <p className="ml-4">A paper trading simulator allows you to practice trading without risking real money by simulating real market conditions.</p>
+        <section id="faq" className="public-section public-container public-faq" aria-labelledby="public-faq-title">
+            <div><p className="public-eyebrow">GOOD TO KNOW</p><h2 id="public-faq-title">A few things<br />before you begin.</h2><p>Practice with a clear understanding of how the simulator works.</p></div>
+            <div className="public-faq-list">
+                <details><summary>What is paper trading?<span aria-hidden="true">+</span></summary><p>Paper trading lets you practice placing trades and managing a virtual portfolio without risking real money. SimTrade orders are simulated and never sent to an exchange.</p></details>
+                <details><summary>Are the prices real?<span aria-hidden="true">+</span></summary><p>The workspace labels its market data mode. Live mode uses provider quotes, which may be delayed. Demo mode uses invented prices for practice. When fresh quotes are unavailable, new trades cannot be placed.</p></details>
+                <details><summary>Do I need to deposit money?<span aria-hidden="true">+</span></summary><p>No deposit is needed. Every new account starts with $100,000 in virtual funds. The balance is for practice and cannot be withdrawn.</p></details>
+                <details><summary>What can I learn from my portfolio?<span aria-hidden="true">+</span></summary><p>You can review cash, open positions, unrealized gains and losses, and completed trades. Simulated results help you explore a strategy, but do not predict results in real markets.</p></details>
             </div>
-            <div className="faq-item">
-            <h4 className="text-xl font-semibold mb-2">How does the real-time data work?</h4>
-            <p className="ml-4">The simulator uses websockets and financial data APIs to simulate trades as they happen in the real world.</p>
-            </div>
-            <div className="faq-item">
-            <h4 className="text-xl font-semibold mb-2">Is the simulator free to use?</h4>
-            <p className="ml-4">Yes, completely free!</p>
-            </div>
-        </div>
         </section>
     );
 }
 
-export default FAQ;
+export default Faq;

@@ -1,0 +1,27 @@
+# Local credentials and configuration
+/backend/api.env
+.env
+.env.*
+!.env.example
+
+# Python environments, bytecode, and test output
+.venv/
+venv/
+/backend/bin/
+/backend/lib/
+/backend/include/
+/backend/pyvenv.cfg
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Frontend dependencies and generated output
+node_modules/
+dist/
+coverage/
+
+# Local editor and operating-system files
+.DS_Store
+*.swp

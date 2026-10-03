@@ -1,0 +1,2 @@
+/* The main landmark is a programmatic reading destination, not an interactive control. */
+.route-entry main[tabindex='-1']:focus { outline: none; }
