@@ -130,4 +130,18 @@ Ten concurrency and order-retry tests require an isolated PostgreSQL database an
 
 GitHub Actions runs the backend tests and frontend test/lint/build checks on pushes and pull requests using Python 3.12 and Node.js 22. It supplies a disposable PostgreSQL 16 service so the concurrency tests also run in CI.
 
+### Browser checks
+
+The Playwright suite runs the production frontend against an actual API with invented demo quotes. It covers registration, login, portfolio views, fractional trading, order replay, history and logout. GitHub Actions uses the runner's installed Google Chrome with its sandbox enabled; no vendor key or browser download is needed there.
+
+To run it on a machine that supports Chrome's sandbox, install Google Chrome and use a dedicated local PostgreSQL database ending in `_test`:
+
+```sh
+SIMTRADE_TEST_POSTGRES_URL=postgresql://test_user:test_password@127.0.0.1:5432/simtrade_test \
+SIMTRADE_TEST_PYTHON="$(pwd)/backend/.venv/bin/python" \
+npm --prefix frontend run test:e2e
+```
+
+The suite validates the database URL before starting services, uses a synthetic signing key, and starts its own API on port 18765 and frontend preview on port 4173. It refuses to reuse existing servers. Both ports must be available. Test accounts remain in the disposable test database. Sandboxing is required; unsupported local environments can use the hosted CI result instead of disabling it. Failure screenshots and traces are written to ignored local test-output directories.
+
 Password hashing uses bcrypt directly and continues to verify existing Passlib-generated `$2a$`, `$2b$`, and `$2y$` hashes. Passwords over 72 UTF-8 bytes are rejected rather than truncated. The backend uses PyJWT for token handling; unused Passlib and python-jose dependencies have been removed.

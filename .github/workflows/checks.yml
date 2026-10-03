@@ -69,3 +69,11 @@ jobs:
       - name: Build frontend
         run: npm run build
         working-directory: frontend
+
+      - name: Verify demo trading in sandboxed Chrome
+        run: npm run test:e2e
+        working-directory: frontend
+        timeout-minutes: 5
+        env:
+          SIMTRADE_TEST_POSTGRES_URL: postgresql://simtrade:test-only-simtrade@localhost:5432/simtrade_test
+          SIMTRADE_TEST_PYTHON: python
