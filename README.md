@@ -101,9 +101,17 @@ Selling more than the current holding opens or increases a simulated short posit
 
 Cash settles to cents: buy debits round up and sell credits round down. This conservative rounding can reduce a fractional fill's value by less than one cent, and prevents manufacturing cash by splitting fills. An order's unrounded value must be at least $0.01 and at most $1 billion. Reducing an existing position is exempt from the minimum so small residual holdings can always be closed. Quantities support eight decimal places, with a maximum of one million units per order or net position. Quotes above $1 million per unit and cash balances above $10 billion are outside the simulation limits. These bounds retain cent-level cash precision with the existing Float database columns.
 
+Orders for a symbol with duplicate legacy portfolio rows return `409` before financial writes. Inspect affected positions with `SELECT user_id, symbol, COUNT(*) FROM portfolios GROUP BY user_id, symbol HAVING COUNT(*) > 1;` and reconcile them against trade history before repairing the data. Startup does not consolidate those rows automatically.
+
 Account net worth is cash plus the signed market value of all positions. When fresh quotes are unavailable, portfolio/account snapshots retain the last known quote or persisted mark. Holdings with no known mark keep a null `current_price`; account totals estimate their value at average entry price and return `valuation_estimated: true`, which the dashboard labels explicitly. A displayed valuation does not guarantee that an order can execute at that price.
 
 The dashboard calculates unrealized profit/loss as signed quantity times the difference between the mark and average entry price, for each open position and the portfolio total. Missing marks display `N/A`. These figures exclude realized gains/losses and the small cash effects of cent settlement; they are not a historical performance chart.
+
+## Order retries
+
+`POST /BUY` and `POST /SELL` accept an optional UUID `client_order_id` alongside `symbol` and `quantity`. Generate a new UUID for each intentional order and reuse it when retrying an uncertain result. A successful order stores a receipt in the same transaction as its cash, position and history changes. Matching retries return the original success without another fill, even after the quote expires. Reusing an ID for a different side, symbol or quantity returns `409`; failed orders do not reserve IDs. IDs are scoped to an account. Clients that omit the field retain the original behavior, where each accepted request creates a fill.
+
+The browser uses this protection for manual retries of an unchanged order after a timeout or server error. It never retries orders automatically. Reloading, leaving the trading page or changing order details starts a new intent, so check trade history first if the earlier result is uncertain. Confirmed successful orders receive a new ID for the next intentional trade. Restart the backend after upgrading so startup can create the new `order_receipts` table.
 
 ## Checks
 
@@ -116,9 +124,9 @@ npm --prefix frontend run lint
 npm --prefix frontend run build
 ```
 
-The default backend test run uses disposable SQLite databases and synthetic signing keys. Quote-feed tests inject fake connections, while transport regressions exercise real WebSocket subscriptions and quotes through a local HTTP CONNECT proxy. Frontend tests mock API/WebSocket traffic. These tests do not contact the market-data vendor and do not require a running PostgreSQL server or a vendor API key.
+The default backend test run uses disposable SQLite databases and synthetic signing keys, with fixtures isolated from local credentials and market mode. Quote-feed tests inject fake connections, while transport regressions exercise real WebSocket subscriptions and quotes through a local HTTP CONNECT proxy. Frontend tests mock API/WebSocket traffic. These tests do not contact the market-data vendor and do not require a running PostgreSQL server or a vendor API key.
 
-Three concurrency tests require an isolated PostgreSQL database and otherwise skip. To run them locally, set `SIMTRADE_TEST_POSTGRES_URL` to a dedicated PostgreSQL database whose name ends in `_test`, then rerun the backend command above. The database role needs permission to create schemas; each test creates and drops its own randomly named schema. Use test credentials and a disposable database.
+Ten concurrency and order-retry tests require an isolated PostgreSQL database and otherwise skip. To run them locally, set `SIMTRADE_TEST_POSTGRES_URL` to a dedicated PostgreSQL database whose name ends in `_test`, then rerun the backend command above. The database role needs permission to create schemas; each test creates and drops its own randomly named schema. Use test credentials and a disposable database.
 
 GitHub Actions runs the backend tests and frontend test/lint/build checks on pushes and pull requests using Python 3.12 and Node.js 22. It supplies a disposable PostgreSQL 16 service so the concurrency tests also run in CI.
 

@@ -41,7 +41,7 @@ describe('order entry', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Buy' }));
     expect(screen.getByRole('button', { name: 'Sell' }).disabled).toBe(true);
     expect(axios.post).toHaveBeenCalledWith(expect.stringMatching(/\/BUY$/),
-      { symbol: 'BTC/USD', quantity: 0.125 }, expect.objectContaining({ headers: { Authorization: 'Bearer test-token' } }));
+      { symbol: 'BTC/USD', quantity: 0.125, client_order_id: expect.stringMatching(/^[0-9a-f-]{36}$/i) }, expect.objectContaining({ headers: { Authorization: 'Bearer test-token' } }));
     await act(async () => complete({ data: { msg: 'Trade created successfully' } }));
     expect(screen.getByRole('status').textContent).toMatch(/buy.*0.125.*BTC\/USD.*completed/i);
     expect(screen.getByRole('button', { name: 'Sell' }).disabled).toBe(false);
