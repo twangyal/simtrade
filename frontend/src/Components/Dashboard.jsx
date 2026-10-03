@@ -8,6 +8,7 @@ import Icon from './Icon';
 import MarketStatus from './MarketStatus';
 import PortfolioExposure from './PortfolioExposure';
 import TableRegion from './TableRegion';
+import { formatUnitPrice } from '../unitPrice';
 
 const Dashboard = () => {
     const [account, setAccount] = useState(null);
@@ -91,7 +92,7 @@ const Dashboard = () => {
                             const gain = positionGain(item);
                             return <tr key={item.id ?? item.symbol}>
                                 <td><Link className="asset-cell" to={`/trade?symbol=${encodeURIComponent(item.symbol)}`} aria-label={`Trade ${item.symbol}`}><span className={`asset-badge asset-${instrument.category.toLowerCase()}`} aria-hidden="true">{instrument.badge}</span><span><strong>{item.symbol}</strong><small>{item.quantity < 0 ? 'Short' : 'Long'} position</small></span></Link></td>
-                                <td>{item.quantity}</td><td>{formatMoney(item.avg_price)}</td><td>{formatMoney(item.current_price == null ? null : item.quantity * item.current_price)}</td><td className={gain == null || gain === 0 ? '' : gain < 0 ? 'value-negative' : 'value-positive'}>{formatMoney(gain)}</td>
+                                <td>{item.quantity}</td><td>{formatUnitPrice(item.avg_price)}</td><td>{formatMoney(item.current_price == null ? null : item.quantity * item.current_price)}</td><td className={gain == null || gain === 0 ? '' : gain < 0 ? 'value-negative' : 'value-positive'}>{formatMoney(gain)}</td>
                             </tr>;
                         })}</tbody>
                     </table>
