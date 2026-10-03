@@ -11,6 +11,7 @@ import RequireSession from './Components/RequireSession';
 import TradePageBoundary from './Components/TradePageBoundary';
 import AppShell from './Components/AppShell';
 import useSession from './useSession';
+import RouteEntry, { RouteEntryProvider } from './Components/RouteEntry';
 
 const Trade = lazy(() => import('./Components/Trade.jsx'));
 
@@ -24,23 +25,25 @@ function App() {
 
     return (
         <div className="App">
-            <Routes>
-                <Route path="/" element={<Lander />} />
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-                <Route element={<RequireSession />}>
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/trade" element={
-                        <TradePageBoundary>
-                            <Suspense fallback={<AppShell section="Trade"><div className="panel route-recovery"><p role="status">Loading trading page…</p><div className="loading-bars" aria-hidden="true"><span /><span /><span /></div></div></AppShell>}>
-                                <Trade />
-                            </Suspense>
-                        </TradePageBoundary>
-                    } />
-                    <Route path="/trade-history" element={<TradeHistory />} />
-                </Route>
-                <Route path="*" element={<main className="not-found"><span className="eyebrow">SIMTRADE / 404</span><h1>A little off course.</h1><p>This page doesn’t exist. Let’s get you back to familiar ground.</p><Link className="button button-primary" to={session ? '/dashboard' : '/'}>{session ? 'Return to dashboard' : 'Return home'}</Link></main>} />
-            </Routes>
+            <RouteEntryProvider>
+                <Routes>
+                    <Route path="/" element={<RouteEntry><Lander /></RouteEntry>} />
+                    <Route path="/login" element={<RouteEntry><Login /></RouteEntry>} />
+                    <Route path="/register" element={<RouteEntry><Register /></RouteEntry>} />
+                    <Route element={<RequireSession />}>
+                        <Route path="/dashboard" element={<RouteEntry><Dashboard /></RouteEntry>} />
+                        <Route path="/trade" element={
+                            <TradePageBoundary>
+                                <Suspense fallback={<AppShell section="Trade"><div className="panel route-recovery"><p role="status">Loading trading page…</p><div className="loading-bars" aria-hidden="true"><span /><span /><span /></div></div></AppShell>}>
+                                    <RouteEntry><Trade /></RouteEntry>
+                                </Suspense>
+                            </TradePageBoundary>
+                        } />
+                        <Route path="/trade-history" element={<RouteEntry><TradeHistory /></RouteEntry>} />
+                    </Route>
+                    <Route path="*" element={<RouteEntry><main className="not-found"><span className="eyebrow">SIMTRADE / 404</span><h1>A little off course.</h1><p>This page doesn’t exist. Let’s get you back to familiar ground.</p><Link className="button button-primary" to={session ? '/dashboard' : '/'}>{session ? 'Return to dashboard' : 'Return home'}</Link></main></RouteEntry>} />
+                </Routes>
+            </RouteEntryProvider>
         </div>
     );
 }

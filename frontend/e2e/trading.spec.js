@@ -75,6 +75,16 @@ async function navigateWorkspace(page, label) {
     .getByRole('link', { name: label, exact: true }).click();
 }
 
+async function expectRouteEntry(page, headingName) {
+  // Inspect arrival before any locator action could repair scroll or focus.
+  const heading = page.getByRole('heading', { level: 1, name: headingName, exact: true });
+  await expect(heading).toBeInViewport({ ratio: 1 });
+  await expect.poll(() => page.evaluate(() => window.scrollY), 'A new page must start at the top').toBeLessThanOrEqual(1);
+  await expect.poll(() => heading.evaluate((element) =>
+    document.activeElement === element || document.activeElement === element.closest('main')),
+  'Focus must arrive at the destination heading or main content').toBe(true);
+}
+
 async function expectNoHorizontalOverflow(page) {
   const widths = await page.evaluate(() => ({
     viewport: document.documentElement.clientWidth,
@@ -363,6 +373,7 @@ test('desktop registration, real quote chart, fractional replay, and protected r
   await tradeLink.focus();
   await page.keyboard.press('Enter');
   await expect(page).toHaveURL(`${FRONTEND_ORIGIN}/trade`);
+  await expectRouteEntry(page, 'Make your next move.');
   await expect(page.getByLabel('Instrument', { exact: true })).toHaveValue(symbol);
   await expect(page.getByText(`Fresh quote available for ${symbol}.`, { exact: true })).toBeVisible();
   await expect(page.getByRole('note')).toHaveText('Demo quote: this price is synthetic, not live market data.');
@@ -473,6 +484,22 @@ test('public landing page fits desktop and mobile viewports', async ({ page }, t
     await expect(page.getByRole('heading', { name: 'Register', exact: true })).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }
+
+  // A short viewport keeps Register scrollable, so browser height-clamping
+  // cannot hide retained scroll from a link near the bottom of the landing page.
+  await page.setViewportSize({ width: 390, height: 520 });
+  await page.getByRole('link', { name: 'Back to home', exact: true }).click();
+  await expect(page).toHaveURL(`${FRONTEND_ORIGIN}/`);
+  const footerRegister = page.getByRole('contentinfo').getByRole('link', { name: 'Create an account', exact: true });
+  await footerRegister.scrollIntoViewIfNeeded();
+  await footerRegister.focus();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(`${FRONTEND_ORIGIN}/register`);
+  await expect(page.getByRole('heading', { name: 'Register', exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollHeight - window.innerHeight),
+    'The destination must remain scrollable to exercise route scroll reset').toBeGreaterThan(0);
+  await expectRouteEntry(page, 'Register');
 });
 
 test('mobile layouts keep trading usable and trap and restore navigation focus', async ({ page }, testInfo) => {
@@ -520,6 +547,35 @@ test('mobile layouts keep trading usable and trap and restore navigation focus',
   await expect(page.getByRole('img', { name: 'Position exposure chart', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Trade BTC/USD', exact: true })).toBeVisible();
   await captureLayout(page, testInfo, 'mobile-overview-populated');
+
+  // Unlike header navigation, this real holding link starts from a scrolled page.
+  const holdingLink = page.getByRole('link', { name: 'Trade BTC/USD', exact: true });
+  await holdingLink.scrollIntoViewIfNeeded();
+  await holdingLink.focus();
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(`${FRONTEND_ORIGIN}/trade?symbol=BTC%2FUSD`);
+  await expectRouteEntry(page, 'Make your next move.');
+  await page.getByRole('link', { name: 'Jump to order ticket', exact: true }).click();
+  await expect(page).toHaveURL(`${FRONTEND_ORIGIN}/trade?symbol=BTC%2FUSD#order-ticket`);
+  await expect(page.getByRole('heading', { name: 'Order ticket', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(page.locator('#order-ticket')).toBeFocused();
+
+  // Changing only the selected instrument must preserve the user's place.
+  const instrument = page.getByLabel('Instrument', { exact: true });
+  await instrument.evaluate((element) => element.scrollIntoView({ block: 'start', behavior: 'instant' }));
+  await instrument.focus();
+  const instrumentScroll = await page.evaluate(() => window.scrollY);
+  expect(instrumentScroll).toBeGreaterThan(0);
+  await instrument.selectOption('AAPL');
+  await expect(page).toHaveURL(`${FRONTEND_ORIGIN}/trade?symbol=AAPL`);
+  await expectReceivedQuoteChart(page, 'AAPL');
+  await expect(instrument).toBeFocused();
+  expect(Math.abs(await page.evaluate(() => window.scrollY) - instrumentScroll),
+    'An instrument query change must preserve scroll position').toBeLessThanOrEqual(1);
+
+  await navigateWorkspace(page, 'Overview');
+  await expect(page.getByRole('img', { name: 'Position exposure chart', exact: true })).toBeVisible();
   await expectTableColumnsReachable(page, 'Portfolio holdings', 'Unrealized P&L');
   await captureLayout(page, testInfo, 'mobile-overview-values');
 
