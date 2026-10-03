@@ -7,6 +7,7 @@ import AppShell from './AppShell';
 import Icon from './Icon';
 import MarketStatus from './MarketStatus';
 import PortfolioExposure from './PortfolioExposure';
+import TableRegion from './TableRegion';
 
 const Dashboard = () => {
     const [account, setAccount] = useState(null);
@@ -78,7 +79,7 @@ const Dashboard = () => {
         <div className="portfolio-grid">
             <section className="panel holdings-panel" aria-labelledby="holdings-title">
                 <div className="panel-heading"><div><p className="eyebrow">WHAT YOU HOLD</p><h2 id="holdings-title">Portfolio</h2></div><span className="count-badge">{portfolioReady ? `${portfolio.length} position${portfolio.length === 1 ? '' : 's'}` : '—'}</span></div>
-                <div className="table-scroll" tabIndex={0} role="region" aria-label="Portfolio holdings">
+                <TableRegion label="Portfolio holdings">
                     <table className="data-table holdings-table">
                         <thead><tr>{['Asset', 'Quantity', 'Average Price', 'Total Value', 'Unrealized P&L'].map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead>
                         <tbody>{portfolio.map((item) => {
@@ -90,7 +91,7 @@ const Dashboard = () => {
                             </tr>;
                         })}</tbody>
                     </table>
-                </div>
+                </TableRegion>
                 {!loading && portfolioReady && !portfolio.length && <div className="empty-state"><span className="empty-state-icon"><Icon name="layers" size={28} /></span><h3>No assets in portfolio</h3><p>Every portfolio starts with a first idea.<br />Find an instrument and make it yours.</p><Link className="button button-secondary" to="/trade">Make your first trade<Icon name="arrow" size={16} /></Link></div>}
                 {!loading && !portfolioReady && <div className="empty-state"><Icon name="refresh" size={24} /><h3>Your holdings could not load</h3><p>Refresh your account to try again.</p></div>}
                 <div className="panel-footnote">Unrealized P&L uses average entry prices and the last known quote. It excludes realized gains, losses, and cash rounding.</div>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api, { authHeaders, errorMessage, formatMoney } from '../api';
 import AppShell from './AppShell';
 import Icon from './Icon';
+import TableRegion from './TableRegion';
 import { Link } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 10;
@@ -48,7 +49,7 @@ const TradeHistory = () => {
             <div className="panel-heading"><div><p className="eyebrow">YOUR TRADING JOURNAL</p><h2 id="activity-title">Recent activity</h2></div><button className="text-button" aria-label="Refresh trade history" disabled={loading} onClick={() => setRevision((value) => value + 1)}><Icon name="refresh" size={15} />Refresh</button></div>
             {error && <p role="alert" className="notice notice-error history-notice">{error}</p>}
             {loading && <p role="status" className="loading-message history-notice">Loading trade history…</p>}
-            <div className="table-scroll" tabIndex={0} role="region" aria-label="Trade records">
+            <TableRegion label="Trade records">
                 <table className="data-table history-table"><thead><tr>
                     {['Date', 'Side', 'Symbol', 'Quantity', 'Price', 'Notional'].map((heading) => <th key={heading} scope="col">{heading}</th>)}
                 </tr></thead><tbody>{trades.map((trade) => <tr key={trade.id}>
@@ -56,7 +57,7 @@ const TradeHistory = () => {
                     <td><span className={`side-badge ${trade.quantity < 0 ? 'side-sell' : 'side-buy'}`}>{trade.quantity < 0 ? 'Sell' : 'Buy'}</span></td>
                     <td><strong>{trade.symbol}</strong></td><td>{Math.abs(trade.quantity)}</td><td>{formatMoney(trade.price)}</td><td>{formatMoney(Math.abs(trade.quantity) * trade.price)}</td>
                 </tr>)}</tbody></table>
-            </div>
+            </TableRegion>
             {!loading && !error && !trades.length && <div className="empty-state history-empty"><span className="empty-state-icon"><Icon name="history" size={28} /></span><h3>No trades available</h3><p>Your first trade is the beginning of your story.<br />When you make a move, it will appear here.</p><Link className="button button-secondary" to="/trade">Explore instruments<Icon name="arrow" size={16} /></Link></div>}
             <div className="pagination"><button className="button button-quiet" onClick={() => setCurrentPage((page) => page - 1)} disabled={loading || currentPage <= 1}>Previous</button><span>{totalPages > 0 ? `Page ${currentPage} of ${totalPages}` : 'No pages'}</span><button className="button button-quiet" onClick={() => setCurrentPage((page) => page + 1)} disabled={loading || currentPage >= totalPages}>Next</button></div>
         </section>
