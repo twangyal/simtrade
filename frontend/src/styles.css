@@ -154,7 +154,8 @@ button, a, input, select { transition: background-color .16s, border-color .16s,
 .instrument-picker label { color: #5b7262; font-size: 11px; }
 .instrument-picker select { background: #fff; border: 1px solid #dce6dd; border-radius: 8px; font-size: 11px; color: #314d3a; padding: 12px; max-width: 270px; min-height: 44px; }
 .trading-grid { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 24px; align-items: start; }
-.order-column { min-width: 0; }
+.order-column { min-width: 0; scroll-margin-top: 24px; }
+.mobile-order-link { display: none; }
 .order-ticket { padding: 23px; }
 .order-ticket-heading { display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #e8eee8; padding-bottom: 20px; margin-bottom: 20px; }
 .order-ticket-heading h2 { font-size: 20px; letter-spacing: -.5px; font-weight: 600; margin: 0; }
@@ -245,6 +246,7 @@ button, a, input, select { transition: background-color .16s, border-color .16s,
   .instrument-picker { width: 100%; }
   .instrument-picker select { max-width: none; flex: 1; min-width: 0; }
   .order-ticket { padding: 23px; }
+  .mobile-order-link { display: flex; justify-content: flex-end; gap: 8px; min-height: 40px; align-items: center; margin: -10px 0 12px; color: #216e57; font-size: 12px; font-weight: 600; }
   .order-column { display: grid; grid-template-columns: 1fr; }
   .history-table { min-width: 650px; }
   .pagination { padding: 16px; }

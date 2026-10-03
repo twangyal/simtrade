@@ -105,3 +105,22 @@ it('charts valid received ticks once and resets the trace and range for a new in
   expect(screen.queryByTestId('quote-price-line')).toBeNull();
   expect(screen.getByRole('button', { name: 'All', exact: true }).getAttribute('aria-pressed')).toBe('true');
 });
+
+it('reports sanitized quotes to the latest callback without reconnecting on callback changes', () => {
+  vi.spyOn(Date, 'now').mockReturnValue(1_000);
+  const first = vi.fn();
+  const second = vi.fn();
+  const { rerender } = render(<Info instrumentSelect="AAPL" onQuote={first} />);
+  expect(first).toHaveBeenCalledWith(null);
+  act(() => sockets[0].onmessage({ data: JSON.stringify({ symbol: 'AAPL', price: ['123'], bid: '122', ask: '124', source: 'demo' }) }));
+  expect(first).toHaveBeenLastCalledWith({ symbol: 'AAPL', price: 123, bid: 122, ask: 124, source: 'demo', receivedAt: 1_000 });
+  rerender(<Info instrumentSelect="AAPL" onQuote={second} />);
+  expect(sockets).toHaveLength(1);
+  act(() => sockets[0].onmessage({ data: JSON.stringify({ symbol: 'AAPL', price: 125 }) }));
+  expect(first).toHaveBeenCalledTimes(2);
+  expect(second).toHaveBeenLastCalledWith({ symbol: 'AAPL', price: 125, receivedAt: 1_000 });
+  rerender(<Info instrumentSelect="QQQ" onQuote={second} />);
+  expect(second).toHaveBeenLastCalledWith(null);
+  act(() => sockets[0].onmessage({ data: JSON.stringify({ symbol: 'AAPL', price: 126 }) }));
+  expect(second).toHaveBeenCalledTimes(2);
+});

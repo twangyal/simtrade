@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import api, { authHeaders, errorMessage } from '../api';
 import Icon from './Icon';
+import OrderEstimate from './OrderEstimate';
 
 const CHECK_HISTORY = 'The earlier order result is uncertain. Check trade history before placing another order.';
 
@@ -16,7 +17,7 @@ function createOrderId() {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function TradeControls({ selectedOption }) {
+function TradeControls({ selectedOption, quote }) {
     const [shares, setShares] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -109,6 +110,7 @@ function TradeControls({ selectedOption }) {
             <p id="quantity-help" className="field-hint">Fractional quantities are supported.</p>
             <div className="order-detail"><span>Execution</span><strong>Latest available quote</strong></div>
             <div className="order-detail"><span>Account</span><strong>Paper trading</strong></div>
+            <OrderEstimate quantity={shares} symbol={selectedOption} quote={quote} />
             <div className="order-actions">
                 <button onClick={() => submitOrder('BUY')} disabled={Boolean(pending)}
                     className="button order-buy">
@@ -127,5 +129,11 @@ function TradeControls({ selectedOption }) {
     );
 }
 
-TradeControls.propTypes = { selectedOption: PropTypes.string.isRequired };
+TradeControls.propTypes = {
+    selectedOption: PropTypes.string.isRequired,
+    quote: PropTypes.shape({
+        symbol: PropTypes.string.isRequired, price: PropTypes.number.isRequired,
+        bid: PropTypes.number, ask: PropTypes.number, receivedAt: PropTypes.number.isRequired,
+    }),
+};
 export default TradeControls;

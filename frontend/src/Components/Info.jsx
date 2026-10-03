@@ -1,14 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import Price from './price.jsx';
 import { WS_URL } from '../api';
 import { appendQuote, normalizeQuote } from '../quotes';
 import MarketQuoteChart from './MarketQuoteChart';
 
-function Info({ instrumentSelect }) {
+function Info({ instrumentSelect, onQuote }) {
   const [data, setData] = useState(null);
   const [history, setHistory] = useState([]);
   const [status, setStatus] = useState('Connecting to market data…');
+  const quoteListener = useRef(onQuote);
+
+  useEffect(() => {
+    quoteListener.current = onQuote;
+  }, [onQuote]);
 
   useEffect(() => {
     let active = true;
@@ -18,6 +23,7 @@ function Info({ instrumentSelect }) {
     setData(null);
     setHistory([]);
     setStatus('Connecting to market data…');
+    quoteListener.current?.(null);
 
     const retry = (message) => {
       if (!active) return;
@@ -50,6 +56,7 @@ function Info({ instrumentSelect }) {
           setData(quote);
           setStatus('Last received quote');
           setHistory((points) => appendQuote(points, quote, receivedAt));
+          quoteListener.current?.({ ...quote, receivedAt });
         } catch {
           setStatus('Unable to read market data. Waiting for the next quote…');
         }
@@ -87,5 +94,5 @@ function Info({ instrumentSelect }) {
   );
 }
 
-Info.propTypes = { instrumentSelect: PropTypes.string.isRequired };
+Info.propTypes = { instrumentSelect: PropTypes.string.isRequired, onQuote: PropTypes.func };
 export default Info;
