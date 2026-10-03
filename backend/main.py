@@ -2,7 +2,7 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR
+from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR, localcontext
 import math
 import os
 
@@ -194,7 +194,9 @@ async def execute_order(trade, user, db, side):
     except LookupError as exc:
         raise HTTPException(status_code=503, detail='A fresh market quote is unavailable. Try again later.') from exc
     quantity = Decimal(str(trade.quantity))
-    notional = quantity * Decimal(str(price))
+    with localcontext() as context:
+        context.prec = 40
+        notional = quantity * Decimal(str(price))
     if notional > MAX_ORDER_VALUE:
         raise HTTPException(status_code=400, detail='Order value exceeds the simulation limit')
     held = Decimal(str(await crud.get_total_quantity_by_symbol(db, record.id, trade.symbol)))

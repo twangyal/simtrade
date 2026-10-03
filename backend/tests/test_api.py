@@ -247,6 +247,11 @@ class AccountApiTests(unittest.TestCase):
         self.assertEqual(self.order('SELL', quantity=0.00005).status_code, 200)
         self.assertEqual(self.client.get('/portfolio', headers=self.headers).json(), [])
 
+    def test_raw_notional_minimum_is_not_rounded_up_by_decimal_context(self):
+        self.quote(price=2.7000000000000027e-8)
+        self.assertEqual(self.order('SELL', quantity=370370.37037037).status_code, 400)
+        self.assertEqual(self.account()['balance'], 100000)
+
     def test_account_isolation(self):
         self.quote()
         self.assertEqual(self.order().status_code, 200)
