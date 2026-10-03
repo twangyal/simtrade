@@ -1,43 +1,36 @@
-import { useRef, useState } from 'react';
-import api, { errorMessage } from '../api';
+import { useState } from 'react';
+import useAuthRequest from '../useAuthRequest';
+import { setSession } from '../session';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const Login = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [busy, setBusy] = useState(false);
-    const submitting = useRef(false);
+    const { busy, error, setError, submit } = useAuthRequest();
     const navigate = useNavigate();
     const location = useLocation();
 
-    const handleSubmit = async (event) => {
+    const handleSubmit = (event) => {
         event.preventDefault();
-        if (submitting.current) return;
+        if (busy) return;
         setError('');
         if (!username.trim() || !password) {
             setError('Enter your username and password.');
             return;
         }
-        submitting.current = true;
-        setBusy(true);
-        try {
-            const response = await api.post('/login', { username: username.trim(), password });
-            if (!response.data.access_token) throw new Error('Missing access token');
-            localStorage.setItem('accessToken', response.data.access_token);
-            navigate('/dashboard');
-        } catch (error) {
-            setError(errorMessage(error, 'Unable to log in. Please check your credentials and connection.'));
-        } finally {
-            submitting.current = false;
-            setBusy(false);
-        }
+        submit('/login', { username: username.trim(), password }, (response) => {
+            setSession(response.data.access_token);
+            const requestedPath = location.state?.from;
+            const destination = ['/dashboard', '/trade', '/trade-history'].includes(requestedPath) ? requestedPath : '/dashboard';
+            navigate(destination, { replace: true });
+        }, 'Unable to log in. Please check your credentials and connection.');
     };
 
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-100">
             <div className="bg-white shadow-md rounded-lg p-8 max-w-md w-full">
                 <h1 className="text-3xl font-bold text-center mb-6">Login</h1>
+                {location.state?.loginRequired && <p role="status" className="text-gray-700 mb-4">Please log in to continue.</p>}
                 {location.state?.registered && <p role="status" className="text-green-700 mb-4">Account created. Log in to start trading.</p>}
                 <form aria-busy={busy} onSubmit={handleSubmit} className="space-y-6">
                     <div>

@@ -1,20 +1,24 @@
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
+import { clearSession } from '../session';
 
 const Sidebar = ({ isOpen, onClose }) => {
     const navigate = useNavigate();
+
+    if (!isOpen) return null;
 
     const handleNavigate = (path) => {
         navigate(path);
         onClose();
     };
     const handleLogout = () => {
-        localStorage.removeItem('accessToken');
-        navigate('/login');
+        clearSession();
+        onClose();
+        navigate('/login', { replace: true });
     };
 
     return (
-        <div className={`fixed top-0 right-0 w-64 h-full bg-white shadow-lg transform ${isOpen ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 ease-in-out`}>
+        <div className="fixed top-0 right-0 w-64 h-full bg-white shadow-lg">
             <div className="p-6">
                 <button aria-label="Close navigation" className="absolute top-4 right-4 text-xl" onClick={onClose}>X</button>
                 <div className="mt-8">

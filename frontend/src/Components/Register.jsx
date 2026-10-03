@@ -1,34 +1,24 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api, { errorMessage } from '../api';
+import useAuthRequest from '../useAuthRequest';
 
 function Register() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [busy, setBusy] = useState(false);
-    const submitting = useRef(false);
+    const { busy, error, setError, submit } = useAuthRequest();
     const navigate = useNavigate();
 
-    const handleRegister = async (event) => {
+    const handleRegister = (event) => {
         event.preventDefault();
-        if (submitting.current) return;
+        if (busy) return;
         setError('');
         if (!username.trim() || !password) {
             setError('Enter a username and password.');
             return;
         }
-        submitting.current = true;
-        setBusy(true);
-        try {
-            await api.post('/register', { username: username.trim(), password });
-            navigate('/login', { state: { registered: true } });
-        } catch (error) {
-            setError(errorMessage(error, 'Unable to register. Please try again.'));
-        } finally {
-            submitting.current = false;
-            setBusy(false);
-        }
+        submit('/register', { username: username.trim(), password }, () => {
+            navigate('/login', { replace: true, state: { registered: true } });
+        }, 'Unable to register. Please try again.');
     };
 
     return (

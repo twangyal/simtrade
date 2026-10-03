@@ -6,7 +6,7 @@ import Login from '../Components/Login';
 import Register from '../Components/Register';
 
 vi.mock('axios', () => {
-  const client = { post: vi.fn() };
+  const client = { post: vi.fn(), interceptors: { response: { use: vi.fn() } } };
   client.create = () => client;
   return { default: client };
 });

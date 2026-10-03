@@ -9,7 +9,7 @@ import TradeHistory from '../Components/TradeHistory';
 import Price from '../Components/price';
 
 vi.mock('axios', () => {
-  const client = { get: vi.fn(), post: vi.fn() };
+  const client = { get: vi.fn(), post: vi.fn(), interceptors: { response: { use: vi.fn() } } };
   client.create = () => client;
   return { default: client };
 });
