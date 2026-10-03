@@ -1,254 +1,220 @@
-import os
-import json
+"""Paper-trading API. Network market data is explicitly opt-in."""
 import asyncio
-from fastapi import FastAPI, WebSocket, HTTPException, Depends
-from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-import websockets
-from contextlib import asynccontextmanager
-import math
-from typing import List
-
+from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
-from databases import Database
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+import math
+import os
 
-from security import get_password_hash, verify_password, create_access_token, decode_access_token, Token, TokenData, ACCESS_TOKEN_EXPIRE_MINUTES
-from models import User
-from database import Base, engine, database, Base
-from schema import UserCreate, UserLogin, BalanceResponse, TradeCreate, Trade, TradePagination, UserInfo
+from databases import Database
+from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+
+from database import Base, database, engine
+from market import MarketFeed, QuoteBook, SUPPORTED_SYMBOLS
+from models import Portfolio, STARTING_BALANCE, User
+from schema import TradeCreate, TradePagination, UserCreate, UserInfo, UserLogin
+from security import (
+    ACCESS_TOKEN_EXPIRE_MINUTES, Token, TokenData, create_access_token,
+    decode_access_token, get_password_hash, verify_password,
+)
 import crud
 
-
-load_dotenv("api.env")
-API_KEY = os.getenv("API_KEY")
-WEB_SOCKET_URL = f"wss://ws.twelvedata.com/v1/quotes/price?apikey={API_KEY}"
-
-instrument_list = {"AAPL":[0],"INFY":[0], "QQQ":[0],"IXIC":[0],"TRP":[0],"EUR/USD":[0],"USD/JPY":[0], "BTC/USD":[0]}
-connected_clients = []
+quote_book = QuoteBook()
+connected_clients: set[WebSocket] = set()
 
 
-# On startup, connect to the WebSocket API
+async def broadcast_to_clients(data):
+    """A disconnected or slow browser must not interrupt the market feed."""
+    async def send(client):
+        try:
+            await asyncio.wait_for(client.send_json(data), timeout=2)
+        except Exception:
+            connected_clients.discard(client)
+    await asyncio.gather(*(send(client) for client in tuple(connected_clients)))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    asyncio.create_task(receive_data_from_api())
+    feed_task = None
+    enabled = os.getenv('MARKET_DATA_ENABLED', 'false').lower() == 'true'
+    api_key = os.getenv('API_KEY')
+    if enabled and not api_key:
+        raise RuntimeError('API_KEY is required when MARKET_DATA_ENABLED=true')
+    # Schema initialization happens at startup, never merely by importing the API.
+    await asyncio.to_thread(Base.metadata.create_all, bind=engine)
     await database.connect()
-    yield
-    print("Shutting down")
-    await database.disconnect()
+    try:
+        if enabled:
+            feed = MarketFeed(quote_book, broadcast_to_clients, api_key)
+            feed_task = asyncio.create_task(feed.run())
+        yield
+    finally:
+        try:
+            if feed_task is not None:
+                feed_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await feed_task
+        finally:
+            for client in tuple(connected_clients):
+                with suppress(Exception):
+                    await client.close(code=1001)
+            connected_clients.clear()
+            await database.disconnect()
 
 
-# Create a FastAPI instance
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(title='SimTrade API', lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_origins=[origin.strip() for origin in os.getenv(
+        'CORS_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173'
+    ).split(',') if origin.strip()],
+    allow_credentials=False,
+    allow_methods=['GET', 'POST'],
+    allow_headers=['Authorization', 'Content-Type'],
 )
-Base.metadata.create_all(bind=engine)
 
 
-# Dependency to get a database connection
 async def get_db():
     async with database.transaction():
         yield database
 
 
-# Method to receive data from the WebSocket API
-async def receive_data_from_api():
-    global current_instrument
-    global current_price
-    try:
-        # Connect to the WebSocket API
-        async with websockets.connect(WEB_SOCKET_URL) as ws:
-            subscribe_message = {
-                "action": "subscribe",
-                "params": {
-                    "symbols": "AAPL,INFY,TRP,QQQ,IXIC,EUR/USD,USD/JPY,BTC/USD"
-                }           
-            }
-            await ws.send(json.dumps(subscribe_message))
-            
-            while True:
-                try:
-                    try:
-                        response =await asyncio.wait_for(ws.recv(), timeout=0.2)
-                        data = json.loads(response)
-                        current_price = data.get("price")
-                        for key in instrument_list:
-                            if key == data.get("symbol"):
-                                    if data.get("ask"):
-                                        instrument_list[key] = [data.get("price"), data.get("ask"), data.get("bid")]
-                                    else:
-                                        instrument_list[key] = [current_price]
-                        await broadcast_to_clients(data)
-                    except asyncio.TimeoutError:
-                        for key in instrument_list:
-                            if len(instrument_list[key]) == 1:
-                                await broadcast_to_clients({"symbol": key, "price": instrument_list[key]})
-                            else:
-                                await broadcast_to_clients({"symbol": key, "price": instrument_list[key][0], "ask": instrument_list[key][1], "bid": instrument_list[key][2]})
-                        continue
-                except Exception as e:
-                    print(f"Error receiving data: {e}")
-                    break
-    except Exception as e:
-        print(e)
-
-
-async def broadcast_to_clients(data):
-    if not connected_clients:
-        return
-    for client in connected_clients:
-        try:
-            await client.send_json(data)
-        except Exception as e:
-            print(f"Error sending data to client: {e}")
-            connected_clients.remove(client)
-
-
-@app.websocket("/ws")
+@app.websocket('/ws')
 async def websocket_endpoint(websocket: WebSocket):
     await websocket.accept()
-    connected_clients.append(websocket)
-    print("Client connected")
-    print(connected_clients.__len__())
+    connected_clients.add(websocket)
     try:
+        for symbol in SUPPORTED_SYMBOLS:
+            quote = quote_book.get(symbol, require_fresh=True)
+            if quote:
+                await websocket.send_json(quote)
         while True:
-            await websocket.receive_text()  # Keep the connection alive
-    except Exception as e:
-        print(f"Client disconnected: {e}")
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
     finally:
-        connected_clients.remove(websocket)
+        connected_clients.discard(websocket)
 
 
-#User API
-@app.post("/register")
+@app.post('/register')
 async def register(user: UserCreate, db: Database = Depends(get_db)):
-    query = User.__table__.select().where(User.username == user.username)
-    existing_user = await db.fetch_one(query)
-    if existing_user:
-        raise HTTPException(status_code=400, detail="Username already registered")
+    if await crud.get_user(db, user.username):
+        raise HTTPException(status_code=400, detail='Username already registered')
+    hashed_password = await asyncio.to_thread(get_password_hash, user.password)
+    # A nested transaction also leaves the outer transaction usable on a duplicate race.
+    try:
+        async with db.transaction():
+            await db.execute(User.__table__.insert().values(
+                username=user.username, hashed_password=hashed_password,
+                balance=STARTING_BALANCE, short_liability=0, networth=STARTING_BALANCE,
+            ))
+    except Exception as exc:
+        # Drivers expose different exception types; only handle the unique-username race.
+        if await crud.get_user(db, user.username):
+            raise HTTPException(status_code=400, detail='Username already registered') from exc
+        raise
+    return {'msg': 'User created successfully'}
 
-    hashed_password = get_password_hash(user.password)
-    query = User.__table__.insert().values(username=user.username, hashed_password=hashed_password, balance=100000.0, short_liability=0.0)
-    await db.execute(query)
-    return {"msg": "User created successfully"}
 
-
-@app.post("/login", response_model=Token)
+@app.post('/login', response_model=Token)
 async def login(user: UserLogin, db: Database = Depends(get_db)):
-    query = User.__table__.select().where(User.username == user.username)
-    db_user = await db.fetch_one(query)
-    if not db_user or not verify_password(user.password, db_user.hashed_password):
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+    db_user = await crud.get_user(db, user.username)
+    if not db_user or not await asyncio.to_thread(verify_password, user.password, db_user.hashed_password):
+        raise HTTPException(status_code=401, detail='Invalid credentials', headers={'WWW-Authenticate': 'Bearer'})
+    token = create_access_token(
+        data={'sub': user.username}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
+    )
+    return {'access_token': token, 'token_type': 'bearer'}
 
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
-    return {"access_token": access_token, "token_type": "bearer"}
+
+async def require_user(db, username, *, for_update=False):
+    record = await crud.get_user(db, username, for_update=for_update)
+    if record is None:
+        raise HTTPException(status_code=404, detail='User not found')
+    return record
+
+
+async def marked_portfolio(db, user_id):
+    """Use the latest known quote; preserve persisted marks when the feed is offline."""
+    holdings = []
+    for record in await crud.get_portfolio(db, user_id):
+        holding = dict(record)
+        quote = quote_book.get(record.symbol)
+        price = quote['price'] if quote else record.current_price
+        if price is None or not math.isfinite(price) or price <= 0:
+            price = record.avg_price
+        holding['current_price'] = price
+        if price != record.current_price:
+            await db.execute(Portfolio.__table__.update().where(
+                Portfolio.id == record.id
+            ).values(current_price=price))
+        holdings.append(holding)
+    return holdings
 
 
 @app.get('/user_data', response_model=UserInfo)
 async def read_user_data(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
-    await get_current_prices(db)
-    user_record = await crud.get_user(db, user.username)
-    await crud.update_short_liability(db, user_record.id, await get_new_short_liability(db, user_record.id))
-    await crud.update_networth(db, user_record.id, await get_new_networth(db, user_record.username, user_record.id))
-    if not user_record:
-        raise HTTPException(status_code=404, detail="User not found")
-    return UserInfo(**user_record)
+    record = await require_user(db, user.username, for_update=True)
+    holdings = await marked_portfolio(db, record.id)
+    liability = sum(item['quantity'] * item['current_price'] for item in holdings if item['quantity'] < 0)
+    networth = record.balance + sum(item['quantity'] * item['current_price'] for item in holdings)
+    liability = await crud.update_short_liability(db, record.id, liability)
+    networth = await crud.update_networth(db, record.id, networth)
+    return UserInfo(id=record.id, username=record.username, balance=record.balance,
+                    short_liability=liability, networth=networth)
 
 
-async def get_new_short_liability(db: Database, id: int):
-    new_short_liability = 0 
-    for item in await crud.get_portfolio(db, id):
-        if item.quantity < 0:
-            price = instrument_list[item.symbol][0]
-            new_short_liability += item.quantity*price
-    return new_short_liability
-
-
-async def get_new_networth(db: Database, username: str, id: int):
-    balance = await crud.get_balance(db, username)
-    short_liability = await crud.get_short_liability(db, username)
-    for item in await crud.get_portfolio(db, id):
-        if(item.quantity > 0):
-            item.current_price = instrument_list[item.symbol][0]
-            balance += item.quantity*item.current_price
-            print(balance)
-    return balance + short_liability
-
-
-@app.get("/portfolio")
+@app.get('/portfolio')
 async def read_portfolio(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
-    await get_current_prices(db)
-    user_record = await crud.get_user(db, user.username)
-    if not user_record:
-        raise HTTPException(status_code=404, detail="User not found")
-    user_id = user_record.id
-    portfolio = await crud.get_portfolio(db, user_id)
-    return portfolio
+    record = await require_user(db, user.username, for_update=True)
+    return await marked_portfolio(db, record.id)
 
 
-async def get_current_prices(db: Database):
-    for key in instrument_list:
-        price = instrument_list[key][0]
-        await crud.update_prices(db, key, price)
-    
+@app.get('/trades', response_model=TradePagination)
+async def read_trades(
+    limit: int = Query(10, ge=1, le=100), page: int = Query(1, ge=1),
+    user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db),
+):
+    record = await require_user(db, user.username)
+    count = await crud.get_trade_count(db, record.id)
+    trades = await crud.get_trades(db, record.id, limit=limit, offset=limit * (page - 1))
+    return {'totalPages': math.ceil(count / limit), 'trades': [dict(trade) for trade in trades]}
 
 
-@app.get("/trades",response_model=TradePagination)
-async def read_trades(limit: int, page: int, user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
-    user_record = await crud.get_user(db, user.username)
-    if not user_record:
-        raise HTTPException(status_code=404, detail="User not found")
-    user_id = user_record.id
-    trades = await crud.get_trades(db, user_id)
-    trades.reverse()
-    return {
-        "totalPages": math.ceil(len(trades)/10),
-        "trades": trades[limit*(page-1):limit*page]
-    }    
+async def execute_order(trade, user, db, side):
+    # PostgreSQL holds this account lock until get_db commits every order write.
+    record = await require_user(db, user.username, for_update=True)
+    try:
+        price = quote_book.execution_price(trade.symbol, side)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail='Unsupported symbol') from exc
+    except LookupError as exc:
+        raise HTTPException(status_code=503, detail='A fresh market quote is unavailable. Try again later.') from exc
+    try:
+        total = (Decimal(str(trade.quantity)) * Decimal(str(price))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+    except InvalidOperation as exc:
+        raise HTTPException(status_code=400, detail='Order value is too large') from exc
+    if total < Decimal('0.01'):
+        raise HTTPException(status_code=400, detail='Order value must be at least $0.01')
+    balance = Decimal(str(record.balance))
+    if side == 'BUY' and balance < total:
+        raise HTTPException(status_code=400, detail='Insufficient balance')
+    balance += -total if side == 'BUY' else total
+    if not math.isfinite(float(balance)):
+        raise HTTPException(status_code=400, detail='Order value is too large')
+    await crud.update_balance(db, record.id, float(balance))
+    await crud.create_trade(db, record.id, trade.symbol,
+                            trade.quantity if side == 'BUY' else -trade.quantity,
+                            price, 'LONG' if side == 'BUY' else 'SHORT')
+    return {'msg': 'Trade created successfully'}
 
 
-@app.post("/BUY")
+@app.post('/BUY')
 async def buy_shares(trade: TradeCreate, user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
-    user_record = await crud.get_user(db, user.username)
-    if not user_record:
-        raise HTTPException(status_code=404, detail="User not found")
-    user_id = user_record.id
-    if(trade.quantity <= 0):
-        raise HTTPException(status_code=400, detail="Invalid quantity")
-    
-    if len(instrument_list[trade.symbol]) == 3:
-        price = instrument_list[trade.symbol][1]
-    else:
-        price = instrument_list[trade.symbol][0]
-    if(await crud.get_balance(db, user.username) < trade.quantity*price):
-        raise HTTPException(status_code=400, detail="Insufficient balance")
-    
-    # Update the user's balance and create a trade record
-    await crud.update_balance(db, user_id, await crud.get_balance(db, user.username) - trade.quantity*price)
-    await crud.create_trade(db, user_id, trade.symbol, trade.quantity, price, "LONG")
-    return {"msg": "Trade created successfully"}
+    return await execute_order(trade, user, db, 'BUY')
 
 
-@app.post("/SELL")
+@app.post('/SELL')
 async def sell_shares(trade: TradeCreate, user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
-    user_data = await crud.get_user(db, user.username)
-    if not user_data:
-        raise HTTPException(status_code=404, detail="User not found")
-    user_id = user_data.id
-    if trade.quantity <= 0:
-        raise HTTPException(status_code=400, detail="Invalid quantity")
-    
-    if len(instrument_list[trade.symbol]) == 3:
-        price = instrument_list[trade.symbol][2]
-    else:
-        price = instrument_list[trade.symbol][0]
-        
-    # Update the user's balance and create a trade record
-    await crud.update_balance(db, user_id, await crud.get_balance(db, user.username) + trade.quantity * price)
-    await crud.create_trade(db, user_id, trade.symbol, -trade.quantity, price, "SHORT")
-    return {"msg": "Trade created successfully"}
+    return await execute_order(trade, user, db, 'SELL')

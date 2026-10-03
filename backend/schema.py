@@ -1,14 +1,29 @@
-from pydantic import BaseModel
-from typing import List
 from datetime import datetime
+from pydantic import BaseModel, Field, field_validator
 
-class UserCreate(BaseModel):
-    username: str
-    password: str
 
 class UserLogin(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=72)
+
+    @field_validator('username')
+    @classmethod
+    def username_not_blank(cls, value):
+        if not value.strip():
+            raise ValueError('Username must not be blank')
+        return value
+
+    @field_validator('password')
+    @classmethod
+    def password_within_bcrypt_limit(cls, value):
+        if len(value.encode('utf-8')) > 72:
+            raise ValueError('Password must be at most 72 UTF-8 bytes')
+        return value
+
+
+class UserCreate(UserLogin):
+    pass
+
 
 class UserInfo(BaseModel):
     id: int
@@ -17,12 +32,11 @@ class UserInfo(BaseModel):
     short_liability: float
     networth: float
 
-class BalanceResponse(BaseModel):
-    current_balance: float
 
 class TradeCreate(BaseModel):
-    symbol: str
-    quantity: float
+    symbol: str = Field(min_length=1, max_length=20)
+    quantity: float = Field(gt=0, allow_inf_nan=False)
+
 
 class Trade(BaseModel):
     id: int
@@ -32,6 +46,7 @@ class Trade(BaseModel):
     trade_type: str
     timestamp: datetime
 
+
 class TradePagination(BaseModel):
     totalPages: int
-    trades: List[Trade]
+    trades: list[Trade]

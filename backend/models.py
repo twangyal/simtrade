@@ -3,13 +3,16 @@ from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
 
+STARTING_BALANCE = 100000.0
+
+
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True)
-    balance = Column(Float, default=10000.0)
+    balance = Column(Float, default=STARTING_BALANCE)
     short_liability = Column(Float, default=0.0)
-    networth = Column(Float, default=10000.0)
+    networth = Column(Float, default=STARTING_BALANCE)
     hashed_password = Column(String)
     trades = relationship("Trade", back_populates="user", cascade="all, delete-orphan")
     portfolio = relationship("Portfolio", back_populates="user", cascade="all, delete-orphan")

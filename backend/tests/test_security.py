@@ -157,7 +157,7 @@ class TokenTests(unittest.TestCase):
         self.assert_unauthorized(f"Bearer {self.signed_token({'sub': 'alice'})}")
 
     def test_deeply_nested_jwt_header_is_unauthorized(self):
-        header = '{"alg":"HS256","extra":' + '[' * 1100 + '0' + ']' * 1100 + '}'
+        header = '{"alg":"HS256","extra":' + '[' * 10000 + '0' + ']' * 10000 + '}'
         encoded_header = base64.urlsafe_b64encode(header.encode()).rstrip(b"=").decode()
         self.assert_unauthorized(f"Bearer {encoded_header}.e30.AAAA")
 

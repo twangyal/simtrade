@@ -79,6 +79,6 @@ def decode_access_token(authorization: Optional[str] = Header(None)) -> TokenDat
         ):
             raise jwt.InvalidTokenError("Invalid expiration")
         return TokenData(username=username)
-    except (jwt.InvalidTokenError, TypeError, ValueError, OverflowError):
-        # Malformed NumericDate claims can also raise built-in conversion errors.
+    except (jwt.InvalidTokenError, TypeError, ValueError, OverflowError, RecursionError):
+        # Invalid dates and excessive JSON nesting also raise built-in exceptions.
         raise credentials_error from None
