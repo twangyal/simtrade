@@ -77,6 +77,8 @@ Only public endpoint URLs belong in frontend configuration. Vendor credentials a
 
 Market networking is disabled by default. Registration, login, and account/history views work without a vendor key, while orders return `503` until a fresh quote is available. To receive live quotes, set `MARKET_DATA_ENABLED=true` and provide `API_KEY`. The feed reconnects with bounded backoff and resubscribes after a disconnect.
 
+The market transport uses proxy-aware websockets 17.2. For the secure vendor connection, it honors `HTTPS_PROXY` or `WSS_PROXY` and respects `NO_PROXY`; `HTTP_PROXY` alone applies to plain `ws://` connections. Lowercase proxy variables take precedence. Proxy URLs may use an HTTP CONNECT endpoint. TLS certificate and hostname verification remain enabled for the vendor and for HTTPS proxy connections, using the Python runtime's configured trust roots. Transport debug logging remains disabled to keep credential-bearing URLs out of logs.
+
 Supported symbols are `AAPL`, `INFY`, `QQQ`, `IXIC`, `TRP`, `EUR/USD`, `USD/JPY`, and `BTC/USD`. Orders require a valid quote no more than 60 seconds old. Vendor timestamps are checked for age and ordering; delayed ticks retain only their remaining lifetime. Buys use the ask and sells use the bid when a complete spread is available; otherwise they use the last price.
 
 Selling more than the current holding opens or increases a simulated short position. Buying a short position covers it, and crossing through zero opens a position in the other direction. There is no margin, collateral, liquidation, or stock-borrow model. Short-sale proceeds increase cash, but the negative position remains a liability when calculating net worth.
@@ -96,7 +98,7 @@ npm --prefix frontend run lint
 npm --prefix frontend run build
 ```
 
-The default backend test run uses disposable SQLite databases and synthetic signing keys. Quote-feed tests inject fake connections, and frontend tests mock API/WebSocket traffic. These tests do not contact the market-data vendor and do not require a running PostgreSQL server or a vendor API key.
+The default backend test run uses disposable SQLite databases and synthetic signing keys. Quote-feed tests inject fake connections, while transport regressions exercise real WebSocket subscriptions and quotes through a local HTTP CONNECT proxy. Frontend tests mock API/WebSocket traffic. These tests do not contact the market-data vendor and do not require a running PostgreSQL server or a vendor API key.
 
 Three concurrency tests require an isolated PostgreSQL database and otherwise skip. To run them locally, set `SIMTRADE_TEST_POSTGRES_URL` to a dedicated PostgreSQL database whose name ends in `_test`, then rerun the backend command above. The database role needs permission to create schemas; each test creates and drops its own randomly named schema. Use test credentials and a disposable database.
 
