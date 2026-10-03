@@ -70,6 +70,24 @@ class PortfolioAccountingTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(position.avg_price, 100)
                 self.assertEqual(position.current_price, 160)
 
+    async def test_adding_low_price_fills_preserves_nonzero_cost_basis(self):
+        for symbol, direction in (("AAPL", 1), ("QQQ", -1)):
+            with self.subTest(direction=direction):
+                await crud.add_to_portfolio(self.db, self.user_id, symbol, 1000 * direction, 0.00001)
+                await crud.add_to_portfolio(self.db, self.user_id, symbol, 1000 * direction, 0.00001)
+                position = await self.position(symbol)
+                self.assertEqual(position.quantity, 2000 * direction)
+                self.assertEqual(position.avg_price, 0.00001)
+
+    async def test_weighted_cost_basis_preserves_fractional_quote_precision(self):
+        for symbol, direction in (("AAPL", 1), ("QQQ", -1)):
+            with self.subTest(direction=direction):
+                await crud.add_to_portfolio(self.db, self.user_id, symbol, 1000 * direction, 0.00001)
+                await crud.add_to_portfolio(self.db, self.user_id, symbol, 3000 * direction, 0.00003)
+                position = await self.position(symbol)
+                self.assertEqual(position.quantity, 4000 * direction)
+                self.assertAlmostEqual(position.avg_price, 0.000025, delta=1e-18)
+
     async def test_full_long_sale_and_short_cover_delete_position(self):
         for symbol, direction in (("AAPL", 1), ("QQQ", -1)):
             with self.subTest(direction=direction):

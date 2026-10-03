@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 STARTING_BALANCE = 100000.0
 
@@ -28,7 +28,7 @@ class Trade(Base):
     quantity = Column(Float)  # Negative for sell/short trades
     price = Column(Float)
     trade_type = Column(String)  # "BUY", "SELL", "SELL (SHORT)", "COVER"
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
     user = relationship("User", back_populates="trades")
 

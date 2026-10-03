@@ -64,6 +64,18 @@ class QuoteBookTests(unittest.TestCase):
         self.assertEqual(self.book.execution_price("AAPL", "SHORT"), 99)
         self.assertTrue(self.book.update({"symbol": "AAPL", "price": 100, "bid": 100, "ask": 100}))
 
+    def test_extreme_prices_and_spreads_are_rejected(self):
+        for payload in (
+            {"symbol": "AAPL", "price": 1e308},
+            {"symbol": "AAPL", "price": 100, "bid": 99, "ask": 1e308},
+        ):
+            with self.subTest(payload=payload):
+                self.assertFalse(self.book.update(payload))
+
+    def test_modern_unix_timestamp_is_not_limited_as_a_price(self):
+        book = QuoteBook(clock=lambda: self.now, wall_clock=lambda: 1_800_000_000)
+        self.assertTrue(book.update({"symbol": "AAPL", "price": 100, "timestamp": 1_800_000_000}))
+
     def test_last_price_fallback_and_side_validation(self):
         self.book.update({"symbol": "AAPL", "price": 120})
         for side in ["BUY", "SELL", "SHORT", "COVER", "buy"]:

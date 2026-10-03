@@ -1,6 +1,6 @@
 from databases import Database
 from models import User, Trade, Portfolio
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy import func, select
 
@@ -76,7 +76,7 @@ async def create_trade(db: Database, user_id: int, symbol: str, quantity: float,
         quantity=quantity,
         price=price,
         trade_type=trade_type,
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc).replace(tzinfo=None)
     )
     query = Trade.__table__.insert().values(
         user_id=trade.user_id,
@@ -111,10 +111,11 @@ async def add_to_portfolio(db: Database, user_id: int, symbol: str, quantity: fl
                 # Selling part of a long or covering part of a short keeps its basis.
                 new_avg_price = existing_position.avg_price
             else:
-                new_avg_price = round(
-                    existing_position.avg_price * (abs(old_quantity) / abs(new_quantity))
-                    + price * (abs(quantity) / abs(new_quantity)),
-                    4,
+                new_avg_price = float(
+                    (
+                        Decimal(str(abs(old_quantity))) * Decimal(str(existing_position.avg_price))
+                        + Decimal(str(abs(quantity))) * Decimal(str(price))
+                    ) / Decimal(str(abs(new_quantity)))
                 )
             query = Portfolio.__table__.update().where(Portfolio.user_id == user_id, Portfolio.symbol == symbol).values(
                 quantity=new_quantity,
@@ -137,4 +138,3 @@ async def update_prices(db: Database, symbol: str, new_price: float):
     query = Portfolio.__table__.update().where(Portfolio.symbol == symbol).values(current_price=new_price)
     await db.execute(query)
     return {"msg": "Price updated successfully"}
-

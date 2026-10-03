@@ -136,8 +136,8 @@ class AccountApiTests(unittest.TestCase):
         self.assertEqual(self.account()['balance'], 100000)
 
     def test_overflowing_order_rejected(self):
-        self.quote(price=1e300)
-        self.assertEqual(self.order('SELL', quantity=1e300).status_code, 400)
+        self.quote(price=100)
+        self.assertEqual(self.order('SELL', quantity=1e300).status_code, 422)
         self.assertEqual(self.account()['balance'], 100000)
 
     def test_failed_order_leaves_account_unchanged(self):
@@ -183,6 +183,69 @@ class AccountApiTests(unittest.TestCase):
             with self.subTest(query=query):
                 response = self.client.get(f'/trades?{query}', headers=self.headers)
                 self.assertEqual(response.status_code, 422)
+
+    def test_split_fractional_cent_sale_cannot_create_cash(self):
+        self.quote(price=100)
+        self.assertEqual(self.order(quantity=0.0003).status_code, 200)
+        for _ in range(2):
+            self.assertEqual(self.order('SELL', quantity=0.00015).status_code, 200)
+        self.assertLessEqual(self.account()['balance'], 100000)
+
+    def test_order_quantity_and_precision_are_bounded(self):
+        self.quote(price=100)
+        for quantity in (1000001, 0.000000001, 1e308):
+            with self.subTest(quantity=quantity):
+                self.assertEqual(self.order('SELL', quantity=quantity).status_code, 422)
+        self.assertEqual(self.account()['balance'], 100000)
+
+    def test_position_limit_cannot_be_bypassed_with_multiple_orders(self):
+        self.quote(price=1)
+        self.assertEqual(self.order('SELL', quantity=1000000).status_code, 200)
+        self.assertEqual(self.order('SELL', quantity=1).status_code, 400)
+        self.assertEqual(self.account()['balance'], 1100000)
+
+    def test_order_notional_is_bounded_before_mutations(self):
+        self.quote(price=1000000)
+        self.assertEqual(self.order('SELL', quantity=1001).status_code, 400)
+        self.assertEqual(self.account()['balance'], 100000)
+
+    def test_fractional_cent_buy_rounds_up(self):
+        self.quote(price=100)
+        self.assertEqual(self.order(quantity=0.00011).status_code, 200)
+        self.assertEqual(self.account()['balance'], 99999.98)
+
+    def test_subcent_order_rejected_before_mutations(self):
+        self.quote(price=100)
+        for side in ('BUY', 'SELL'):
+            self.assertEqual(self.order(side, quantity=0.00001).status_code, 400)
+        self.assertEqual(self.account()['balance'], 100000)
+
+    def test_cash_limit_rejects_excess_exposure(self):
+        with self.engine.begin() as connection:
+            connection.execute(User.__table__.update().values(balance=10000000000))
+        self.quote(price=100)
+        self.assertEqual(self.order('SELL').status_code, 400)
+        self.assertEqual(self.account()['balance'], 10000000000)
+
+    def test_largest_supported_valuation_preserves_cents(self):
+        self.quote(price=0.09999999)
+        self.assertEqual(self.order(quantity=1000000).status_code, 200)
+        self.quote(price=1000000)
+        self.assertEqual(self.account()['networth'], 1000000000000.01)
+
+    def test_small_short_can_be_fully_covered_after_price_falls(self):
+        self.quote(price=100)
+        self.assertEqual(self.order('SELL', quantity=0.0001).status_code, 200)
+        self.quote(price=99)
+        self.assertEqual(self.order('BUY', quantity=0.0001).status_code, 200)
+        self.assertEqual(self.client.get('/portfolio', headers=self.headers).json(), [])
+
+    def test_subcent_long_remainder_can_be_closed(self):
+        self.quote(price=100)
+        self.assertEqual(self.order('BUY', quantity=0.00025).status_code, 200)
+        self.assertEqual(self.order('SELL', quantity=0.0002).status_code, 200)
+        self.assertEqual(self.order('SELL', quantity=0.00005).status_code, 200)
+        self.assertEqual(self.client.get('/portfolio', headers=self.headers).json(), [])
 
     def test_account_isolation(self):
         self.quote()

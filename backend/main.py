@@ -2,7 +2,7 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
+from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR
 import math
 import os
 
@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from database import Base, database, engine
 from market import MarketFeed, QuoteBook, SUPPORTED_SYMBOLS
 from models import Portfolio, STARTING_BALANCE, User
+from limits import MAX_CASH_BALANCE, MAX_ORDER_VALUE, MAX_QUANTITY
 from schema import TradeCreate, TradePagination, UserCreate, UserInfo, UserLogin
 from security import (
     ACCESS_TOKEN_EXPIRE_MINUTES, Token, TokenData, create_access_token,
@@ -157,8 +158,9 @@ async def marked_portfolio(db, user_id):
 async def read_user_data(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
     record = await require_user(db, user.username, for_update=True)
     holdings = await marked_portfolio(db, record.id)
-    liability = sum(item['quantity'] * item['current_price'] for item in holdings if item['quantity'] < 0)
-    networth = record.balance + sum(item['quantity'] * item['current_price'] for item in holdings)
+    values = [Decimal(str(item['quantity'])) * Decimal(str(item['current_price'])) for item in holdings]
+    liability = float(sum((value for value in values if value < 0), Decimal(0)).quantize(Decimal('0.01')))
+    networth = float((Decimal(str(record.balance)) + sum(values, Decimal(0))).quantize(Decimal('0.01')))
     liability = await crud.update_short_liability(db, record.id, liability)
     networth = await crud.update_networth(db, record.id, networth)
     return UserInfo(id=record.id, username=record.username, balance=record.balance,
@@ -191,17 +193,28 @@ async def execute_order(trade, user, db, side):
         raise HTTPException(status_code=400, detail='Unsupported symbol') from exc
     except LookupError as exc:
         raise HTTPException(status_code=503, detail='A fresh market quote is unavailable. Try again later.') from exc
+    quantity = Decimal(str(trade.quantity))
+    notional = quantity * Decimal(str(price))
+    if notional > MAX_ORDER_VALUE:
+        raise HTTPException(status_code=400, detail='Order value exceeds the simulation limit')
+    held = Decimal(str(await crud.get_total_quantity_by_symbol(db, record.id, trade.symbol)))
+    signed_quantity = quantity if side == 'BUY' else -quantity
+    reducing_position = held * signed_quantity < 0 and quantity <= abs(held)
+    if notional < Decimal('0.01') and not reducing_position:
+        raise HTTPException(status_code=400, detail='Order value must be at least $0.01')
+    new_quantity = held + signed_quantity
+    if abs(new_quantity) > MAX_QUANTITY:
+        raise HTTPException(status_code=400, detail='Position quantity exceeds the simulation limit')
+    # Conservative cent settlement cannot manufacture cash by splitting fills.
     try:
-        total = (Decimal(str(trade.quantity)) * Decimal(str(price))).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        total = notional.quantize(Decimal('0.01'), rounding=ROUND_CEILING if side == 'BUY' else ROUND_FLOOR)
     except InvalidOperation as exc:
         raise HTTPException(status_code=400, detail='Order value is too large') from exc
-    if total < Decimal('0.01'):
-        raise HTTPException(status_code=400, detail='Order value must be at least $0.01')
     balance = Decimal(str(record.balance))
     if side == 'BUY' and balance < total:
         raise HTTPException(status_code=400, detail='Insufficient balance')
     balance += -total if side == 'BUY' else total
-    if not math.isfinite(float(balance)):
+    if not math.isfinite(float(balance)) or abs(balance) > MAX_CASH_BALANCE:
         raise HTTPException(status_code=400, detail='Order value is too large')
     await crud.update_balance(db, record.id, float(balance))
     await crud.create_trade(db, record.id, trade.symbol,

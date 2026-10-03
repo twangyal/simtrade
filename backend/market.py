@@ -11,6 +11,8 @@ from urllib.parse import urlencode
 
 import websockets
 
+from limits import MAX_QUOTE_PRICE
+
 
 logger = logging.getLogger(__name__)
 # Websockets logs the credential-bearing handshake URL at DEBUG. Keep this
@@ -22,7 +24,7 @@ SUPPORTED_SYMBOLS = (
 )
 
 
-def _positive_number(value):
+def _positive_number(value, *, maximum=MAX_QUOTE_PRICE):
     """Accept JSON numbers, excluding booleans, containers and numeric strings."""
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return None
@@ -30,7 +32,7 @@ def _positive_number(value):
         number = float(value)
     except (ValueError, OverflowError):
         return None
-    return number if math.isfinite(number) and number > 0 else None
+    return number if math.isfinite(number) and 0 < number <= maximum else None
 
 
 class QuoteBook:
@@ -61,7 +63,7 @@ class QuoteBook:
             quote.update(ask=ask, bid=bid)
         received_at = self._clock()
         if "timestamp" in payload:
-            timestamp = _positive_number(payload["timestamp"])
+            timestamp = _positive_number(payload["timestamp"], maximum=math.inf)
             if timestamp is None:
                 return False
             age = self._wall_clock() - timestamp
