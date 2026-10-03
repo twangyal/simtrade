@@ -25,6 +25,33 @@ it('keeps fractional reference levels distinct without binary floating point tai
 });
 
 it.each([
+  [Number.MIN_VALUE, 9 * Number.MIN_VALUE],
+  [4.5e-308, 4.500000000000001e-308],
+  [4.6e-308, 4.600000000000001e-308],
+  [770 * Number.MIN_VALUE, 830 * Number.MIN_VALUE],
+  [4.6e-282, 4.6000000000000005e-282],
+  [4.5e-287, 4.5000000000000013e-287],
+])('contains extreme observations %s to %s with distinct ticks and labels', (low, high) => {
+  const axis = quoteAxis(low, high);
+  expect(axis.low).toBeLessThanOrEqual(low);
+  expect(axis.high).toBeGreaterThanOrEqual(high);
+  expect(axis.low).toBeGreaterThanOrEqual(0);
+  expect(axis.ticks.length).toBeLessThanOrEqual(9);
+  expect(axis.ticks.every(Number.isFinite)).toBe(true);
+  for (let index = 1; index < axis.ticks.length; index += 1) {
+    expect(axis.ticks[index]).toBeGreaterThan(axis.ticks[index - 1]);
+  }
+  const labels = axis.ticks.map((value) => formatAxisPrice(value, axis.step));
+  expect(new Set(labels).size).toBe(axis.ticks.length);
+  // Values outside these bounds would draw above or below the chart plot.
+  for (const price of [low, high]) {
+    const position = (price - axis.low) / (axis.high - axis.low);
+    expect(position).toBeGreaterThanOrEqual(0);
+    expect(position).toBeLessThanOrEqual(1);
+  }
+});
+
+it.each([
   [1.101250001, 1.101250002],
   [60000, 60000.00000001],
   [1e-8, 1.0001e-8],
