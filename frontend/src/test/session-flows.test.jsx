@@ -148,7 +148,7 @@ it('registers, logs in, places a fractional order, reads history and logs out ac
   await screen.findByText('Welcome, FlowTrader');
   fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
   fireEvent.click(screen.getByRole('button', { name: 'Trade', exact: true }));
-  fireEvent.change(screen.getByRole('spinbutton'), { target: { value: '0.25' } });
+  fireEvent.change(await screen.findByRole('spinbutton'), { target: { value: '0.25' } });
   fireEvent.click(screen.getByRole('button', { name: 'Buy' }));
   await screen.findByText('Buy order for 0.25 BTC/USD completed.');
   fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));

@@ -1,5 +1,5 @@
 import './App.css';
-import Trade from './Components/Trade.jsx';
+import { lazy, Suspense } from 'react';
 import Login from './Components/Login.jsx';
 import Dashboard from './Components/Dashboard';
 import Register from './Components/Register.jsx';
@@ -8,6 +8,8 @@ import TradeHistory from './Components/TradeHistory.jsx';
 import { Route, Routes } from 'react-router-dom';
 import './styles.css';
 import RequireSession from './Components/RequireSession';
+
+const Trade = lazy(() => import('./Components/Trade.jsx'));
 
 function App() {
 
@@ -19,7 +21,11 @@ function App() {
                 <Route path="/register" element={<Register />} />
                 <Route element={<RequireSession />}>
                     <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/trade" element={<Trade />} />
+                    <Route path="/trade" element={
+                        <Suspense fallback={<p role="status" className="min-h-screen bg-gray-100 p-6">Loading trading page…</p>}>
+                            <Trade />
+                        </Suspense>
+                    } />
                     <Route path="/trade-history" element={<TradeHistory />} />
                 </Route>
             </Routes>
