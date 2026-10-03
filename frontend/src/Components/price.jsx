@@ -7,11 +7,12 @@ function Price({ data, parentChange }) {
     }
     const { price, bid, ask } = data;
     const currentPrice = Array.isArray(price) ? price[0] : price;
+    const formattedPrice = currentPrice == null ? 'N/A' : formatQuotePrice(currentPrice);
     return (
         <div className="quote-price-row">
             <div>
                 <span className="quote-price-label">Last received price</span>
-                <span className="quote-last-price" aria-label="Last received price">{currentPrice == null ? 'N/A' : formatQuotePrice(currentPrice)}</span>
+                <span className={`quote-last-price${formattedPrice.length > 16 ? ' quote-last-price-long' : ''}`} aria-label="Last received price">{formattedPrice}</span>
             </div>
             {(ask != null || bid != null) && <dl className="quote-spread">
                 {bid != null && <div><dt>Bid</dt><dd>{formatQuotePrice(bid)}</dd></div>}

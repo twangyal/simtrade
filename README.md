@@ -142,7 +142,7 @@ GitHub Actions runs the backend tests and frontend test/lint/build checks on pus
 
 ### Browser checks
 
-The Playwright suite runs the production frontend against an actual API with invented demo quotes. It covers desktop and mobile layouts, keyboard navigation, quote chart interaction, exposure charts, registration, login, fractional trading, order replay, history and logout. It checks for page overflow, browser errors and automated WCAG 2.1 AA accessibility violations, and captures screenshots of the public, authentication and workspace screens. GitHub Actions uses the runner's installed Google Chrome with its sandbox enabled; no vendor key or browser download is needed there.
+The Playwright suite runs the production frontend against an actual API with invented demo quotes. It covers desktop and mobile layouts, keyboard navigation, quote chart interaction, exposure charts, registration, login, fractional trading, order replay, history and logout. A separate controlled WebSocket fixture checks that long scientific-notation quotes remain complete and visible on narrow screens. The suite checks actual text bounds, page overflow, browser errors and automated WCAG 2.1 AA accessibility violations, and captures screenshots of the public, authentication and workspace screens. GitHub Actions uses the runner's installed Google Chrome with its sandbox enabled; no vendor key or browser download is needed there.
 
 To run it on a machine that supports Chrome's sandbox, install Google Chrome and use a dedicated local PostgreSQL database ending in `_test`:
 

@@ -683,3 +683,102 @@ test('mixed long and short exposure fits desktop, tablet, and narrow mobile layo
     await expectMixedExposure(page, largeHoldings);
   }
 });
+
+test('controlled scientific quote frames remain readable and keyboard inspectable', async ({ page, context }, testInfo) => {
+  test.setTimeout(90_000);
+  testInfo.annotations.push({
+    type: 'fixture',
+    description: 'Real local API authentication; controlled incoming WebSocket quotes only. No orders are submitted.',
+  });
+  let quoteSocket;
+  // This exact local route overrides the audit's passthrough for this test only.
+  // Deliberately omit connectToServer: these frames are a labeled browser fixture.
+  await context.routeWebSocket('ws://127.0.0.1:18765/ws', (socket) => { quoteSocket = socket; });
+  await page.setViewportSize({ width: 320, height: 812 });
+  await registerAndLogin(page, testInfo, 'controlled-quotes', { shortUsername: true });
+  await navigateWorkspace(page, 'Trade');
+  await expect.poll(() => Boolean(quoteSocket)).toBe(true);
+
+  const symbol = 'BTC/USD';
+  const panel = page.getByRole('region', { name: `${symbol} market quotes`, exact: true });
+  const chart = panel.getByRole('img', { name: `${symbol} price chart from received quotes`, exact: true });
+  const latestPrice = panel.getByLabel('Last received price', { exact: true });
+  const readout = panel.locator('.market-chart-readout strong');
+  const receiptTime = panel.locator('.market-chart-readout time');
+  // Explicit conversion models received decimal data rounded to JavaScript's
+  // representable Number values; assertions retain their full scientific text.
+  const frames = [
+    ['1.0345678901234567e-308', '1.0245678901234567e-308', '1.0445678901234567e-308'],
+    ['1.1345678901234567e-308', '1.1245678901234567e-308', '1.1445678901234567e-308'],
+    ['1.2345678901234567e-308', '1.2245678901234567e-308', '1.2445678901234567e-308'],
+  ].map(([price, bid, ask]) => ({ price: Number(price), bid: Number(bid), ask: Number(ask) }));
+  expect(new Set(frames.map(({ price }) => price)).size).toBe(3);
+  for (const { price, bid, ask } of frames) {
+    expect([price, bid, ask].every((value) => Number.isFinite(value) && value > 0)).toBe(true);
+    expect(bid).toBeLessThanOrEqual(price);
+    expect(ask).toBeGreaterThanOrEqual(price);
+  }
+  let previousReceipt;
+  for (const [index, frame] of frames.entries()) {
+    if (previousReceipt !== undefined) {
+      await page.waitForFunction((time) => Date.now() > time, previousReceipt);
+    }
+    quoteSocket.send(JSON.stringify({ symbol, ...frame, source: 'demo' }));
+    await expect(latestPrice).toHaveText(frame.price.toExponential());
+    await expect(readout).toHaveText(frame.price.toExponential());
+    await expect(chart).toHaveAttribute('data-point-count', String(index + 1));
+    previousReceipt = Date.parse(await receiptTime.getAttribute('datetime'));
+    expect(Number.isFinite(previousReceipt)).toBe(true);
+  }
+
+  await page.mouse.move(0, 0);
+  const inspector = panel.getByRole('slider', { name: 'Inspect received quotes', exact: true });
+  await inspector.focus();
+  await page.keyboard.press('Home');
+  await expect(inspector).toHaveValue('0');
+  await expect(readout).toHaveText(frames[0].price.toExponential());
+  await page.keyboard.press('ArrowRight');
+  await expect(inspector).toHaveValue('1');
+  await expect(readout).toHaveText(frames[1].price.toExponential());
+  await expect(panel.getByText('Inspecting quote', { exact: true })).toBeVisible();
+  expect(await inspector.getAttribute('aria-valuetext')).toContain(frames[1].price.toExponential());
+
+  const final = frames.at(-1);
+  const bid = panel.locator('.quote-spread div').filter({ has: panel.getByText('Bid', { exact: true }) }).locator('dd');
+  const ask = panel.locator('.quote-spread div').filter({ has: panel.getByText('Ask', { exact: true }) }).locator('dd');
+  for (const viewport of [
+    { name: 'narrow-mobile', width: 320, height: 812 },
+    { name: 'mobile', width: 390, height: 844 },
+    { name: 'tablet-portrait', width: 768, height: 1024 },
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await expect(latestPrice).toHaveText(final.price.toExponential());
+    await expect(bid).toHaveText(final.bid.toExponential());
+    await expect(ask).toHaveText(final.ask.toExponential());
+    await expect(readout).toHaveText(frames[1].price.toExponential());
+    await expect(chart).toHaveAttribute('data-point-count', '3');
+    await captureLayout(page, testInfo, `${viewport.name}-controlled-scientific-quotes`);
+    for (const [amount, label] of [[latestPrice, 'Full scientific price'], [bid, 'Full scientific bid'],
+      [ask, 'Full scientific ask'], [readout, 'Full inspected scientific price']]) {
+      await expectCurrencyFits(amount, panel, label);
+    }
+    const line = chart.getByTestId('quote-price-line');
+    await expect(line).toBeVisible();
+    const geometry = await chart.evaluate((svg) => {
+      const priceLine = svg.querySelector('[data-testid="quote-price-line"]');
+      const shapes = [...svg.querySelectorAll('path, line, circle, text')];
+      return {
+        path: priceLine.getAttribute('d'),
+        length: priceLine.getTotalLength(),
+        finite: shapes.every((shape) => {
+          const { x, y, width, height } = shape.getBBox();
+          return [x, y, width, height].every(Number.isFinite);
+        }),
+      };
+    });
+    expect(geometry.path).not.toMatch(/NaN|Infinity/);
+    expect(Number.isFinite(geometry.length)).toBe(true);
+    expect(geometry.length).toBeGreaterThan(0);
+    expect(geometry.finite, 'Every rendered chart shape must have finite geometry').toBe(true);
+  }
+});
