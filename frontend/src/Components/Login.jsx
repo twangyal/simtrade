@@ -4,6 +4,22 @@ import { setSession } from '../session';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthLayout from './AuthLayout';
 
+const PRIVATE_PATHS = new Set(['/dashboard', '/trade', '/trade-history']);
+
+function returnDestination(requestedPath) {
+    // Validate the original path before URL normalization can discard dot segments or controls.
+    if (typeof requestedPath !== 'string' || requestedPath.includes('\\')
+        || Array.from(requestedPath).some((character) => character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127)
+        || !PRIVATE_PATHS.has(requestedPath.split(/[?#]/, 1)[0])) return '/dashboard';
+    try {
+        const destination = new URL(requestedPath, 'https://simtrade.invalid');
+        if (destination.origin !== 'https://simtrade.invalid') return '/dashboard';
+        return `${destination.pathname}${destination.search}${destination.hash}`;
+    } catch {
+        return '/dashboard';
+    }
+}
+
 const Login = () => {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -22,7 +38,7 @@ const Login = () => {
         submit('/login', { username, password }, (response) => {
             setSession(response.data.access_token);
             const requestedPath = location.state?.from;
-            const destination = ['/dashboard', '/trade', '/trade-history'].includes(requestedPath) ? requestedPath : '/dashboard';
+            const destination = returnDestination(requestedPath);
             navigate(destination, { replace: true });
         }, 'Unable to log in. Please check your credentials and connection.');
     };
