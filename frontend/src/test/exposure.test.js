@@ -79,4 +79,40 @@ describe('marked position exposure', () => {
       expect(offset + weight).toBeLessThanOrEqual(100);
     }
   });
+
+  it('provides correctly rounded money separately from unrounded chart geometry', () => {
+    const result = portfolioExposure([
+      { symbol: 'AAPL', quantity: 0.3, current_price: 100.05 },
+    ]);
+    expect(result.gross).toBe(30.015);
+    expect(result.positions[0].value).toBe(30.015);
+    expect(result.money).toEqual({ gross: 30.02, long: 30.02, short: 0 });
+    expect(result.positions[0].moneyValue).toBe(30.02);
+    expect(result.positions[0].weight).toBe(100);
+  });
+
+  it('rounds direction and gross money totals after summing subcent positions', () => {
+    const result = portfolioExposure([
+      { symbol: 'AAPL', quantity: 0.1, current_price: 100.05 },
+      { symbol: 'QQQ', quantity: 0.1, current_price: 100.05 },
+      { symbol: 'TRP', quantity: -0.1, current_price: 100.05 },
+    ]);
+    expect(result.positions.map(({ moneyValue }) => moneyValue)).toEqual([10, 10, 10]);
+    expect(result.money).toEqual({ gross: 30.02, long: 20.01, short: 10 });
+    expect(result.gross).toBe(30.015);
+    expect(result.long).toBe(20.01);
+    expect(result.short).toBe(10.005);
+  });
+
+  it('keeps exact decimal cents near the maximum supported aggregate exposure', () => {
+    const result = portfolioExposure([
+      ...Array.from({ length: 7 }, (_, index) => ({ symbol: `POSITION${index}`, quantity: 1000000, current_price: 1000000 })),
+      { symbol: 'LAST', quantity: 0.1, current_price: 0.049 },
+    ]);
+    // Conversion to a Number before rounding would turn .0049 into .005 here.
+    expect(result.money.gross).toBe(7000000000000);
+    expect(result.money.long).toBe(7000000000000);
+    expect(result.positions.at(-1).moneyValue).toBe(0);
+    expect(result.positions.at(-1).value).toBe(0.0049);
+  });
 });

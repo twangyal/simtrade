@@ -13,7 +13,9 @@ const percent = (value) => value > 0 && value < 0.1 ? '<0.1%' : `${Number(value.
 function PortfolioExposure({ holdings = [], loading = false, unavailable = false }) {
   const id = useId();
   const exposure = portfolioExposure(holdings);
-  const { gross, long, short, positions, openCount, excludedCount } = exposure;
+  const { gross, long, short, positions, openCount, excludedCount, money } = exposure;
+  const formattedGross = formatMoney(money.gross);
+  const centerAmount = money.gross !== null && money.gross >= 10000 ? compactMoney.format(money.gross) : formattedGross;
   const partial = excludedCount > 0;
   const hasChart = !loading && !unavailable && positions.length > 0;
   const longWeight = gross ? long / gross * 100 : 0;
@@ -53,7 +55,7 @@ function PortfolioExposure({ holdings = [], loading = false, unavailable = false
               aria-describedby={`${id}-chart-description`}>
               <title id={`${id}-chart-title`}>Position exposure chart</title>
               <desc id={`${id}-chart-description`}>
-                {`Gross exposure ${formatMoney(gross)}, based on absolute marked market value. Long positions ${formatMoney(long)} (${percent(longWeight)}); short positions ${formatMoney(short)} (${percent(shortWeight)}). Short positions are liabilities.${partial ? ` ${excludedCount} positions with unavailable market values are excluded.` : ''}`}
+                {`Gross exposure ${formatMoney(money.gross)}, based on absolute marked market value. Long positions ${formatMoney(money.long)} (${percent(longWeight)}); short positions ${formatMoney(money.short)} (${percent(shortWeight)}). Short positions are liabilities.${partial ? ` ${excludedCount} positions with unavailable market values are excluded.` : ''}`}
               </desc>
               <circle cx="110" cy="110" r="84" fill="none" stroke="#edf3ef" strokeWidth="22" />
               <g transform="rotate(-90 110 110)" aria-hidden="true">
@@ -65,7 +67,7 @@ function PortfolioExposure({ holdings = [], loading = false, unavailable = false
             </svg>
             <div className="exposure-panel__center">
               <span>{partial ? 'Known gross exposure' : 'Gross exposure'}</span>
-              <strong title={formatMoney(gross)}>{gross >= 10000 ? compactMoney.format(gross) : formatMoney(gross)}</strong>
+              <strong title={formattedGross}>{centerAmount}</strong>
               <span className="exposure-panel__center-note">across marked positions</span>
             </div>
           </div>
@@ -74,7 +76,7 @@ function PortfolioExposure({ holdings = [], loading = false, unavailable = false
             {positions.map((position, index) => <li key={position.key}>
               <span className="exposure-panel__dot" style={{ backgroundColor: COLORS[index % COLORS.length] }} aria-hidden="true" />
               <span className="exposure-panel__position-name">{`${position.symbol} · ${position.side}`}</span>
-              <span className="exposure-panel__position-value">{formatMoney(position.value)}</span>
+              <span className="exposure-panel__position-value">{formatMoney(position.moneyValue)}</span>
               <span className="exposure-panel__weight">{percent(position.value / gross * 100)}</span>
             </li>)}
           </ul>
@@ -83,11 +85,11 @@ function PortfolioExposure({ holdings = [], loading = false, unavailable = false
         <dl className="exposure-panel__directions">
           <div>
             <dt><span className="exposure-panel__direction-mark" aria-hidden="true">↗</span>Long positions</dt>
-            <dd><span className="exposure-panel__direction-value">{formatMoney(long)}</span><span className="exposure-panel__direction-weight">{percent(longWeight)}</span></dd>
+            <dd><span className="exposure-panel__direction-value">{formatMoney(money.long)}</span><span className="exposure-panel__direction-weight">{percent(longWeight)}</span></dd>
           </div>
           <div>
             <dt><span className="exposure-panel__direction-mark exposure-panel__direction-mark--short" aria-hidden="true">↘</span>Short positions</dt>
-            <dd><span className="exposure-panel__direction-value">{formatMoney(short)}</span><span className="exposure-panel__direction-weight">{percent(shortWeight)}</span></dd>
+            <dd><span className="exposure-panel__direction-value">{formatMoney(money.short)}</span><span className="exposure-panel__direction-weight">{percent(shortWeight)}</span></dd>
           </div>
         </dl>
         {partial && <p className="exposure-panel__partial-note">

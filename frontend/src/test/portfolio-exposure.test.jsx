@@ -70,3 +70,38 @@ it('uses unique accessible chart labels when multiple panels are rendered', () =
   expect(charts[0].getAttribute('aria-labelledby')).not.toBe(charts[1].getAttribute('aria-labelledby'));
   for (const chart of charts) expect(document.getElementById(chart.getAttribute('aria-describedby'))).toBeTruthy();
 });
+
+it('uses rounded decimal money for its description, center, legend and direction totals', () => {
+  render(<PortfolioExposure holdings={[
+    { symbol: 'AAPL', quantity: 0.1, current_price: 100.05 },
+    { symbol: 'QQQ', quantity: 0.1, current_price: 100.05 },
+    { symbol: 'TRP', quantity: -0.1, current_price: 100.05 },
+  ]} />);
+  const chart = screen.getByRole('img', { name: 'Position exposure chart' });
+  const description = document.getElementById(chart.getAttribute('aria-describedby')).textContent;
+  expect(description).toContain('Gross exposure $30.02');
+  expect(description).toContain('Long positions $20.01');
+  expect(description).toContain('short positions $10.00');
+  expect(screen.getByTitle('$30.02').textContent).toBe('$30.02');
+  const positions = within(screen.getByRole('list', { name: 'Marked position breakdown' })).getAllByRole('listitem');
+  for (const position of positions) expect(position.textContent).toContain('$10.00');
+  expect(screen.getByText('Long positions').nextElementSibling.textContent).toContain('$20.01');
+  expect(screen.getByText('Short positions').nextElementSibling.textContent).toContain('$10.00');
+  // Arc shares still come from unrounded marked exposure, not rounded legend values.
+  expect(Number(chart.querySelector('[data-exposure-segment]').getAttribute('stroke-dasharray').split(' ')[0])).toBeCloseTo(100 / 3);
+});
+
+it('bases its compact center and full-value title on final rounded money', () => {
+  render(<PortfolioExposure holdings={[{ symbol: 'AAPL', quantity: 1, current_price: 9999.995 }]} />);
+  expect(screen.getByTitle('$10,000.00').textContent).toBe('$10K');
+});
+
+it('shows unavailable money instead of coercing an unsafe amount to zero or a compact amount', () => {
+  render(<PortfolioExposure holdings={[{ symbol: 'AAPL', quantity: 1e14, current_price: 1 }]} />);
+  const chart = screen.getByRole('img', { name: 'Position exposure chart' });
+  const description = document.getElementById(chart.getAttribute('aria-describedby')).textContent;
+  expect(description).toContain('Gross exposure N/A');
+  expect(screen.getByTitle('N/A').textContent).toBe('N/A');
+  expect(screen.queryByText('$100T')).toBeNull();
+  expect(within(screen.getByRole('list', { name: 'Marked position breakdown' })).getByText('N/A')).toBeTruthy();
+});

@@ -4,6 +4,7 @@ import AppShell from './AppShell';
 import Icon from './Icon';
 import TableRegion from './TableRegion';
 import { formatUnitPrice } from '../unitPrice';
+import { tradeNotional } from '../portfolio';
 import { Link } from 'react-router-dom';
 
 const ITEMS_PER_PAGE = 10;
@@ -56,7 +57,7 @@ const TradeHistory = () => {
                 </tr></thead><tbody>{trades.map((trade) => <tr key={trade.id}>
                     <td><time dateTime={trade.timestamp}>{new Date(trade.timestamp).toLocaleString()}</time></td>
                     <td><span className={`side-badge ${trade.quantity < 0 ? 'side-sell' : 'side-buy'}`}>{trade.quantity < 0 ? 'Sell' : 'Buy'}</span></td>
-                    <td><strong>{trade.symbol}</strong></td><td>{Math.abs(trade.quantity)}</td><td>{formatUnitPrice(trade.price)}</td><td>{formatMoney(Math.abs(trade.quantity) * trade.price)}</td>
+                    <td><strong>{trade.symbol}</strong></td><td>{Math.abs(trade.quantity)}</td><td>{formatUnitPrice(trade.price)}</td><td>{formatMoney(tradeNotional(trade.quantity, trade.price))}</td>
                 </tr>)}</tbody></table>
             </TableRegion>
             {!loading && !error && !trades.length && <div className="empty-state history-empty"><span className="empty-state-icon"><Icon name="history" size={28} /></span><h3>No trades available</h3><p>Your first trade is the beginning of your story.<br />When you make a move, it will appear here.</p><Link className="button button-secondary" to="/trade">Explore instruments<Icon name="arrow" size={16} /></Link></div>}

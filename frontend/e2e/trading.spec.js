@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { writeFile } from 'node:fs/promises';
 import { test as base, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
@@ -98,7 +99,14 @@ async function expectNoHorizontalOverflow(page) {
 async function captureLayout(page, testInfo, name, { fullPage = true } = {}) {
   await page.evaluate(() => document.fonts.ready);
   // Preserve the actual screen even if the following accessibility check fails.
-  await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage, animations: 'disabled' });
+  const scroll = fullPage ? await page.evaluate(() => ({ left: window.scrollX, top: window.scrollY })) : null;
+  try {
+    // Avoid painting off-screen fixed content into an expanded full-page capture.
+    if (scroll) await page.evaluate(() => window.scrollTo({ left: 0, top: 0, behavior: 'instant' }));
+    await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage, animations: 'disabled' });
+  } finally {
+    if (scroll) await page.evaluate((position) => window.scrollTo({ ...position, behavior: 'instant' }), scroll);
+  }
   const { violations } = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
     .analyze();
@@ -288,12 +296,38 @@ async function expectAccountMetricsFit(page) {
   }
 }
 
+function exposureMoneyOracle(holdings) {
+  // Independent standard-library oracle: parse the canonical JSON decimals,
+  // aggregate exact products, then round final money values with half-even ties.
+  const script = `
+import json
+import sys
+from decimal import Decimal, localcontext, ROUND_HALF_EVEN
+
+holdings = json.load(sys.stdin, parse_float=Decimal, parse_int=Decimal)
+with localcontext() as context:
+    context.prec = 400
+    values = [abs(item['quantity'] * item['current_price']) for item in holdings]
+    def money(value):
+        rounded = value.quantize(Decimal('0.01'), rounding=ROUND_HALF_EVEN)
+        return '$' + format(rounded, ',.2f')
+    print(json.dumps({
+        'gross': money(sum(values, Decimal(0))),
+        'long': money(sum((value for item, value in zip(holdings, values) if item['quantity'] > 0), Decimal(0))),
+        'short': money(sum((value for item, value in zip(holdings, values) if item['quantity'] < 0), Decimal(0))),
+        'positions': [money(value) for value in values],
+    }))
+`;
+  return JSON.parse(execFileSync(process.env.SIMTRADE_TEST_PYTHON || 'python3', ['-c', script], {
+    input: JSON.stringify(holdings.map(({ quantity, current_price }) => ({ quantity, current_price }))),
+    encoding: 'utf8', timeout: 10_000, maxBuffer: 64 * 1024,
+  }));
+}
+
 async function expectMixedExposure(page, holdings) {
-  const money = (value) => new Intl.NumberFormat('en-US', {
-    style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2,
-  }).format(value);
-  const marked = holdings.map(({ symbol, quantity, current_price }) => ({
-    symbol, quantity, value: Math.abs(quantity) * current_price,
+  const money = exposureMoneyOracle(holdings);
+  const marked = holdings.map(({ symbol, quantity, current_price }, index) => ({
+    symbol, quantity, value: Math.abs(quantity) * current_price, moneyValue: money.positions[index],
   }));
   expect(marked).toHaveLength(3);
   expect(marked.filter(({ quantity }) => quantity > 0)).toHaveLength(2);
@@ -306,9 +340,9 @@ async function expectMixedExposure(page, holdings) {
   const exposure = page.getByRole('region', { name: 'Position exposure', exact: true });
   const chart = exposure.getByRole('img', { name: 'Position exposure chart', exact: true });
   await expect(chart).toBeVisible();
-  await expect(chart.locator('desc')).toContainText(`Gross exposure ${money(gross)}`);
-  await expect(chart.locator('desc')).toContainText(`Long positions ${money(long)}`);
-  await expect(chart.locator('desc')).toContainText(`short positions ${money(short)}`);
+  await expect(chart.locator('desc')).toContainText(`Gross exposure ${money.gross}`);
+  await expect(chart.locator('desc')).toContainText(`Long positions ${money.long}`);
+  await expect(chart.locator('desc')).toContainText(`short positions ${money.short}`);
   await expect(chart.locator('desc')).toContainText('Short positions are liabilities.');
   const rows = exposure.getByRole('list', { name: 'Marked position breakdown', exact: true }).getByRole('listitem');
   await expect(rows).toHaveCount(3);
@@ -317,13 +351,13 @@ async function expectMixedExposure(page, holdings) {
     const name = `${position.symbol} · ${position.quantity < 0 ? 'Short' : 'Long'}`;
     const row = rows.filter({ has: page.getByText(name, { exact: true }) });
     await expect(row.getByText(name, { exact: true })).toBeVisible();
-    await expect(row.getByText(money(position.value), { exact: true })).toBeVisible();
+    await expect(row.getByText(position.moneyValue, { exact: true })).toBeVisible();
     const weight = position.value / gross * 100;
     await expect(row.getByText(weight < 0.1 ? '<0.1%' : `${Number(weight.toFixed(1))}%`, { exact: true })).toBeVisible();
   }
   // A box can fit while its currency text wraps mid-number. Measure actual text
   // fragments, including both legend amounts and long/short direction totals.
-  const currencyValues = new Set([...marked.map(({ value }) => value), long, short].map(money));
+  const currencyValues = new Set([...money.positions, money.long, money.short]);
   for (const value of currencyValues) {
     const amounts = exposure.getByText(value, { exact: true });
     await expect(amounts.first()).toBeVisible();

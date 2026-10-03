@@ -105,7 +105,7 @@ Orders for a symbol with duplicate legacy portfolio rows return `409` before fin
 
 Account net worth is cash plus the signed market value of all positions. When fresh quotes are unavailable, portfolio/account snapshots retain the last known quote or persisted mark. Holdings with no known mark keep a null `current_price`; account totals estimate their value at average entry price and return `valuation_estimated: true`, which the dashboard labels explicitly. A displayed valuation does not guarantee that an order can execute at that price.
 
-The dashboard calculates unrealized profit/loss as signed quantity times the difference between the mark and average entry price, for each open position and the portfolio total. Missing marks display `N/A`. These figures exclude realized gains/losses and the small cash effects of cent settlement; they are not a historical performance chart.
+The dashboard calculates unrealized profit/loss as signed quantity times the difference between the mark and average entry price, for each open position and the portfolio total. Derived currency values use decimal arithmetic and round final displayed amounts to cents, with half-cent ties going to the even cent, matching account valuation. Totals are calculated before rounding individual rows. Execution and average unit prices preserve their received numeric precision rather than rounding to cents. Missing marks display `N/A`. These figures exclude realized gains/losses and the small cash effects of cent settlement; they are not a historical performance chart.
 
 ## Interface and charts
 
