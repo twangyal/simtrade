@@ -83,6 +83,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: browser-screenshots
-          path: frontend/test-results/**/*.png
+          path: |
+            frontend/test-results/**/*.png
+            frontend/test-results/**/*-accessibility.json
           if-no-files-found: ignore
           retention-days: 7

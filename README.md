@@ -140,7 +140,7 @@ GitHub Actions runs the backend tests and frontend test/lint/build checks on pus
 
 ### Browser checks
 
-The Playwright suite runs the production frontend against an actual API with invented demo quotes. It covers desktop and mobile layouts, keyboard navigation, quote chart interaction, exposure charts, registration, login, fractional trading, order replay, history and logout. It checks for page overflow and browser errors and captures screenshots of the public, authentication and workspace screens. GitHub Actions uses the runner's installed Google Chrome with its sandbox enabled; no vendor key or browser download is needed there.
+The Playwright suite runs the production frontend against an actual API with invented demo quotes. It covers desktop and mobile layouts, keyboard navigation, quote chart interaction, exposure charts, registration, login, fractional trading, order replay, history and logout. It checks for page overflow, browser errors and automated WCAG 2.1 AA accessibility violations, and captures screenshots of the public, authentication and workspace screens. GitHub Actions uses the runner's installed Google Chrome with its sandbox enabled; no vendor key or browser download is needed there.
 
 To run it on a machine that supports Chrome's sandbox, install Google Chrome and use a dedicated local PostgreSQL database ending in `_test`:
 
@@ -150,6 +150,6 @@ SIMTRADE_TEST_PYTHON="$(pwd)/backend/.venv/bin/python" \
 npm --prefix frontend run test:e2e
 ```
 
-The suite validates the database URL before starting services, uses a synthetic signing key, and starts its own API on port 18765 and frontend preview on port 4173. It refuses to reuse existing servers. Both ports must be available. Test accounts remain in the disposable test database. Sandboxing is required; unsupported local environments can use the hosted CI result instead of disabling it. Screenshots are written to ignored local test-output directories and uploaded by CI as the `browser-screenshots` artifact with seven-day retention. Only PNGs are uploaded; traces are disabled because they can include session tokens and request bodies.
+The suite validates the database URL before starting services, uses a synthetic signing key, and starts its own API on port 18765 and frontend preview on port 4173. It refuses to reuse existing servers. Both ports must be available. Test accounts remain in the disposable test database. Sandboxing is required; unsupported local environments can use the hosted CI result instead of disabling it. Screenshots are written to ignored local test-output directories and uploaded by CI as the `browser-screenshots` artifact with seven-day retention. Only PNGs and sanitized accessibility findings are uploaded; traces are disabled because they can include session tokens and request bodies. Automated accessibility checks complement keyboard and visual review; they do not certify full conformance.
 
 Password hashing uses bcrypt directly and continues to verify existing Passlib-generated `$2a$`, `$2b$`, and `$2y$` hashes. Passwords over 72 UTF-8 bytes are rejected rather than truncated. The backend uses PyJWT for token handling; unused Passlib and python-jose dependencies have been removed.

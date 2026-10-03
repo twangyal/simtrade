@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
 import { test as base, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 const FRONTEND_ORIGIN = 'http://127.0.0.1:4173';
 const API_ORIGIN = 'http://127.0.0.1:18765';
@@ -83,10 +85,27 @@ async function expectNoHorizontalOverflow(page) {
   expect(widths.body, 'The body must fit the viewport').toBeLessThanOrEqual(widths.viewport + 1);
 }
 
-async function captureLayout(page, testInfo, name) {
+async function captureLayout(page, testInfo, name, { fullPage = true } = {}) {
   await page.evaluate(() => document.fonts.ready);
+  // Preserve the actual screen even if the following accessibility check fails.
+  await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage, animations: 'disabled' });
+  const { violations } = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+    .analyze();
+  // Keep useful diagnostics without HTML, input values, or session metadata.
+  const findings = violations.map(({ id, impact, help, helpUrl, nodes }) => ({
+    id, impact, help, helpUrl,
+    nodes: nodes.map(({ target, failureSummary }) => ({ target, failureSummary })),
+  }));
+  const reportPath = testInfo.outputPath(`${name}-accessibility.json`);
+  await writeFile(reportPath, JSON.stringify(findings, null, 2));
+  await testInfo.attach(`${name}-accessibility-violations`, {
+    path: reportPath,
+    contentType: 'application/json',
+  });
+  // Collect all page findings in one run; any violation still fails the test.
+  expect.soft(findings, `${name} must meet WCAG 2.1 AA checks`).toEqual([]);
   await expectNoHorizontalOverflow(page);
-  await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage: true, animations: 'disabled' });
 }
 
 async function registerAndLogin(page, testInfo, screenshotPrefix) {
@@ -139,10 +158,13 @@ async function accountSnapshot(page) {
 }
 
 test('desktop registration, real quote chart, fractional replay, and protected routes', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 1440, height: 1000 });
   const symbol = 'BTC/USD';
   const quantity = 0.125;
   const username = await registerAndLogin(page, testInfo, 'desktop');
+  await expect(page.getByRole('button', { name: 'Open navigation', exact: true })).not.toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Main navigation', exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Demo market data', exact: true })).toBeVisible();
   await expect(page.getByText('No assets in portfolio', { exact: true })).toBeVisible();
   await captureLayout(page, testInfo, 'desktop-overview-empty');
@@ -266,6 +288,7 @@ test('public landing page fits desktop and mobile viewports', async ({ page }, t
 });
 
 test('mobile layouts keep trading usable and trap and restore navigation focus', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
   await page.setViewportSize({ width: 390, height: 844 });
   await registerAndLogin(page, testInfo, 'mobile');
   await expect(page.getByText('No assets in portfolio', { exact: true })).toBeVisible();
@@ -278,7 +301,7 @@ test('mobile layouts keep trading usable and trap and restore navigation focus',
   await expect(dialog).toBeVisible();
   await expect(dialog).toHaveAttribute('aria-modal', 'true');
   await expect(dialog.getByRole('button', { name: 'Close navigation', exact: true })).toBeFocused();
-  await captureLayout(page, testInfo, 'mobile-navigation');
+  await captureLayout(page, testInfo, 'mobile-navigation', { fullPage: false });
   const focusable = dialog.locator('a[href], button:not([disabled])');
   const focusableCount = await focusable.count();
   expect(focusableCount).toBeGreaterThan(1);
