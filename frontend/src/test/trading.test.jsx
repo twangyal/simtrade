@@ -63,7 +63,7 @@ describe('account views', () => {
       ? { username: 'Trader', balance: 0, short_liability: 0, networth: 0 } : [] }));
     renderPage(<Dashboard />);
     expect(await screen.findByText('Welcome, Trader')).toBeTruthy();
-    expect(screen.getAllByText('$0.00')).toHaveLength(3);
+    expect(screen.getAllByText('$0.00')).toHaveLength(4);
     expect(screen.queryByText('$50,000')).toBeNull();
   });
 

@@ -177,9 +177,9 @@ async def marked_portfolio(db, user_id):
         quote = quote_book.get(record.symbol)
         price = quote['price'] if quote else record.current_price
         if price is None or not math.isfinite(price) or price <= 0:
-            price = record.avg_price
+            price = None
         holding['current_price'] = price
-        if price != record.current_price:
+        if price is not None and price != record.current_price:
             await db.execute(Portfolio.__table__.update().where(
                 Portfolio.id == record.id
             ).values(current_price=price))
@@ -191,13 +191,16 @@ async def marked_portfolio(db, user_id):
 async def read_user_data(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db, scope='function')):
     record = await require_user(db, user.username, for_update=True)
     holdings = await marked_portfolio(db, record.id)
-    values = [Decimal(str(item['quantity'])) * Decimal(str(item['current_price'])) for item in holdings]
+    estimated = any(item['current_price'] is None for item in holdings)
+    values = [Decimal(str(item['quantity'])) * Decimal(str(
+        item['current_price'] if item['current_price'] is not None else item['avg_price']
+    )) for item in holdings]
     liability = float(sum((value for value in values if value < 0), Decimal(0)).quantize(Decimal('0.01')))
     networth = float((Decimal(str(record.balance)) + sum(values, Decimal(0))).quantize(Decimal('0.01')))
     liability = await crud.update_short_liability(db, record.id, liability)
     networth = await crud.update_networth(db, record.id, networth)
     return UserInfo(id=record.id, username=record.username, balance=record.balance,
-                    short_liability=liability, networth=networth)
+                    short_liability=liability, networth=networth, valuation_estimated=estimated)
 
 
 @app.get('/portfolio')

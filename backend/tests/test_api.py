@@ -252,6 +252,23 @@ class AccountApiTests(unittest.TestCase):
         self.assertEqual(self.order('SELL', quantity=370370.37037037).status_code, 400)
         self.assertEqual(self.account()['balance'], 100000)
 
+    def test_unpriced_legacy_holding_is_explicitly_estimated_without_inventing_mark(self):
+        with self.engine.begin() as connection:
+            connection.execute(User.__table__.update().values(balance=99000))
+            connection.execute(Portfolio.__table__.insert().values(
+                user_id=1, symbol='AAPL', quantity=10, avg_price=100, current_price=None))
+        account = self.account()
+        self.assertEqual(account['networth'], 100000)
+        self.assertTrue(account.get('valuation_estimated'))
+        holding = self.client.get('/portfolio', headers=self.headers).json()[0]
+        self.assertIsNone(holding['current_price'])
+        # Repeated reads must not turn the estimate into a persisted quote.
+        self.assertTrue(self.account().get('valuation_estimated'))
+        self.quote(price=120)
+        account = self.account()
+        self.assertEqual(account['networth'], 100200)
+        self.assertFalse(account.get('valuation_estimated'))
+
     def test_account_isolation(self):
         self.quote()
         self.assertEqual(self.order().status_code, 200)

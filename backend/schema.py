@@ -33,6 +33,7 @@ class UserInfo(BaseModel):
     balance: float
     short_liability: float
     networth: float
+    valuation_estimated: bool = False
 
 
 class TradeCreate(BaseModel):

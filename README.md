@@ -99,7 +99,9 @@ Selling more than the current holding opens or increases a simulated short posit
 
 Cash settles to cents: buy debits round up and sell credits round down. This conservative rounding can reduce a fractional fill's value by less than one cent, and prevents manufacturing cash by splitting fills. An order's unrounded value must be at least $0.01 and at most $1 billion. Reducing an existing position is exempt from the minimum so small residual holdings can always be closed. Quantities support eight decimal places, with a maximum of one million units per order or net position. Quotes above $1 million per unit and cash balances above $10 billion are outside the simulation limits. These bounds retain cent-level cash precision with the existing Float database columns.
 
-Account net worth is cash plus the signed market value of all positions. When fresh quotes are unavailable, portfolio/account snapshots retain the last known mark, falling back to the persisted mark or average entry price. A displayed valuation therefore does not guarantee that an order can execute at that price.
+Account net worth is cash plus the signed market value of all positions. When fresh quotes are unavailable, portfolio/account snapshots retain the last known quote or persisted mark. Holdings with no known mark keep a null `current_price`; account totals estimate their value at average entry price and return `valuation_estimated: true`, which the dashboard labels explicitly. A displayed valuation does not guarantee that an order can execute at that price.
+
+The dashboard calculates unrealized profit/loss as signed quantity times the difference between the mark and average entry price, for each open position and the portfolio total. Missing marks display `N/A`. These figures exclude realized gains/losses and the small cash effects of cent settlement; they are not a historical performance chart.
 
 ## Checks
 
