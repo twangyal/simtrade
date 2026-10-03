@@ -137,7 +137,7 @@ button, a, input, select { transition: background-color .16s, border-color .16s,
 .learning-banner { display: flex; align-items: center; gap: 17px; background: #edf3ee; border: 1px solid #dde8df; border-radius: 11px; padding: 22px; margin-top: 24px; }
 .learning-icon { display: inline-flex; flex-shrink: 0; padding: 11px; border-radius: 11px; background: #ddece0; color: #37684e; }
 .learning-banner strong { font-size: 12px; font-weight: 600; }
-.learning-banner p { color: #62736d; font-size: 11px; line-height: 1.8; margin-top: 5px; max-width: 600px; }
+.learning-banner p { color: #53695e; font-size: 11px; line-height: 1.8; margin-top: 5px; max-width: 600px; }
 .learning-banner > .text-button { margin-left: auto; }
 .loading-message { font-size: 12px; color: #526f60; margin: 12px 0; }
 .notice { border-radius: 7px; padding: 12px 14px; font-size: 12px; line-height: 1.7; margin-block: 12px; overflow-wrap: anywhere; }
