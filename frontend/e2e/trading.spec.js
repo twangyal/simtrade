@@ -269,7 +269,31 @@ async function expectMixedExposure(page, holdings) {
     const row = rows.filter({ has: page.getByText(name, { exact: true }) });
     await expect(row.getByText(name, { exact: true })).toBeVisible();
     await expect(row.getByText(money(position.value), { exact: true })).toBeVisible();
-    await expect(row.getByText(`${Number((position.value / gross * 100).toFixed(1))}%`, { exact: true })).toBeVisible();
+    const weight = position.value / gross * 100;
+    await expect(row.getByText(weight < 0.1 ? '<0.1%' : `${Number(weight.toFixed(1))}%`, { exact: true })).toBeVisible();
+  }
+  // A box can fit while its currency text wraps mid-number. Measure actual text
+  // fragments, including both legend amounts and long/short direction totals.
+  const panelBounds = await exposure.boundingBox();
+  const currencyValues = new Set([...marked.map(({ value }) => value), long, short].map(money));
+  for (const value of currencyValues) {
+    const amounts = exposure.getByText(value, { exact: true });
+    await expect(amounts.first()).toBeVisible();
+    for (const amount of await amounts.all()) {
+      const fragments = await amount.evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        return [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0)
+          .map(({ top, left, right }) => ({ top, left, right }));
+      });
+      expect(fragments.length, `${value} must have visible text`).toBeGreaterThan(0);
+      const lineTops = fragments.map(({ top }) => top);
+      expect(Math.max(...lineTops) - Math.min(...lineTops), `${value} must remain on one line`).toBeLessThanOrEqual(1);
+      for (const fragment of fragments) {
+        expect(fragment.left, `${value} must remain inside the exposure panel`).toBeGreaterThanOrEqual(panelBounds.x - 1);
+        expect(fragment.right, `${value} must remain inside the exposure panel`).toBeLessThanOrEqual(panelBounds.x + panelBounds.width + 1);
+      }
+    }
   }
   const segments = chart.locator('[data-exposure-segment]');
   await expect(segments).toHaveCount(3);
@@ -523,8 +547,8 @@ test('mixed long and short exposure fits desktop, tablet, and narrow mobile layo
     { name: 'narrow-mobile', width: 320, height: 812 },
   ]) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await expectMixedExposure(page, holdings);
     await expect(page.getByRole('region', { name: 'Portfolio holdings', exact: true }).locator('tbody tr')).toHaveCount(3);
+    await expect(page.getByRole('img', { name: 'Position exposure chart', exact: true })).toBeVisible();
     const opener = page.getByRole('button', { name: 'Open navigation', exact: true });
     if (viewport.width >= 1100) {
       await expect(opener).not.toBeVisible();
@@ -533,6 +557,7 @@ test('mixed long and short exposure fits desktop, tablet, and narrow mobile layo
       await expect(opener).toBeVisible();
     }
     await captureLayout(page, testInfo, `${viewport.name}-mixed-overview`);
+    await expectMixedExposure(page, holdings);
   }
 
   await expectTableColumnsReachable(page, 'Portfolio holdings', 'Unrealized P&L');
@@ -541,4 +566,36 @@ test('mixed long and short exposure fits desktop, tablet, and narrow mobile layo
   await expect(page.getByRole('region', { name: 'Trade records', exact: true }).locator('tbody tr')).toHaveCount(3);
   await expectTableColumnsReachable(page, 'Trade records', 'Notional');
   await captureLayout(page, testInfo, 'narrow-mobile-mixed-activity');
+
+  // Use real, permitted demo fills to exercise long currency values. The short
+  // proceeds fund both buys; all three positions and each order stay in limits.
+  const largeFills = await fillLocalDemoOrders(page, [
+    { symbol: 'QQQ', side: 'SELL', quantity: 999_984 },
+    { symbol: 'AAPL', side: 'BUY', quantity: 499_960 },
+    { symbol: 'BTC/USD', side: 'BUY', quantity: 5_000 },
+  ]);
+  expect(largeFills).toEqual([
+    { symbol: 'QQQ', status: 200 },
+    { symbol: 'AAPL', status: 200 },
+    { symbol: 'BTC/USD', status: 200 },
+  ]);
+  const largePortfolioResponse = page.waitForResponse((response) =>
+    response.url() === `${API_ORIGIN}/portfolio` && response.request().method() === 'GET');
+  await navigateWorkspace(page, 'Overview');
+  const largeHoldings = await (await largePortfolioResponse).json();
+  expect(largeHoldings).toEqual(expect.arrayContaining([
+    expect.objectContaining({ symbol: 'AAPL', quantity: 500_000 }),
+    expect.objectContaining({ symbol: 'BTC/USD', quantity: 5_000.125 }),
+    expect.objectContaining({ symbol: 'QQQ', quantity: -999_999 }),
+  ]));
+  expect(largeHoldings.filter(({ quantity, current_price }) => Math.abs(quantity) * current_price > 100_000_000)).toHaveLength(2);
+  for (const viewport of [
+    { name: 'narrow-mobile', width: 320, height: 812 },
+    { name: 'tablet-portrait', width: 768, height: 1024 },
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await expect(page.getByRole('img', { name: 'Position exposure chart', exact: true })).toBeVisible();
+    await captureLayout(page, testInfo, `${viewport.name}-large-exposure`);
+    await expectMixedExposure(page, largeHoldings);
+  }
 });

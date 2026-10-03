@@ -83,11 +83,11 @@ function PortfolioExposure({ holdings = [], loading = false, unavailable = false
         <dl className="exposure-panel__directions">
           <div>
             <dt><span className="exposure-panel__direction-mark" aria-hidden="true">↗</span>Long positions</dt>
-            <dd>{formatMoney(long)}<span>{percent(longWeight)}</span></dd>
+            <dd><span className="exposure-panel__direction-value">{formatMoney(long)}</span><span className="exposure-panel__direction-weight">{percent(longWeight)}</span></dd>
           </div>
           <div>
             <dt><span className="exposure-panel__direction-mark exposure-panel__direction-mark--short" aria-hidden="true">↘</span>Short positions</dt>
-            <dd>{formatMoney(short)}<span>{percent(shortWeight)}</span></dd>
+            <dd><span className="exposure-panel__direction-value">{formatMoney(short)}</span><span className="exposure-panel__direction-weight">{percent(shortWeight)}</span></dd>
           </div>
         </dl>
         {partial && <p className="exposure-panel__partial-note">
