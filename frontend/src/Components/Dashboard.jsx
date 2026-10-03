@@ -59,6 +59,7 @@ const Dashboard = () => {
         ['Unrealized P&L', unrealized, 'Open positions · last known marks', 'chart'],
         ['Short Liability', account?.short_liability, 'Value of open short positions', 'down'],
     ];
+    const wideMetrics = metrics.some(([, value]) => formatMoney(value).length > 11);
     return <AppShell section="Overview">
         <div className="page-heading">
             <div><p className="eyebrow">YOUR NEXT CHAPTER STARTS HERE</p><h1>{account ? `Welcome, ${account.username}` : 'Dashboard'}</h1><p className="page-description">A clear view of your portfolio. A little more perspective for your next move.</p></div>
@@ -68,12 +69,15 @@ const Dashboard = () => {
         <div className="section-toolbar"><div><span className="section-label">Account snapshot</span><span className="snapshot-time">{updatedAt ? `Updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Values in USD'}</span></div><button className="text-button" aria-label="Refresh account" disabled={loading} onClick={() => setRevision((value) => value + 1)}><Icon name="refresh" size={15} />{loading ? 'Refreshing' : 'Refresh'}</button></div>
         {loading && <p role="status" className="loading-message">Loading your account…</p>}
         {errors.map((error) => <p key={error} role="alert" className="notice notice-error">{error}</p>)}
-        <div className="metrics-grid" aria-busy={loading}>
-            {metrics.map(([label, value, caption, icon], index) => <section key={label} className={`metric-card${index === 0 ? ' metric-featured' : ''}`}>
-                <h2>{label}</h2><span className="metric-icon"><Icon name={icon} size={18} /></span>
-                <p className={`metric-value${label === 'Unrealized P&L' && value != null ? value < 0 ? ' value-negative' : value > 0 ? ' value-positive' : '' : ''}`}>{formatMoney(value)}</p>
-                <p className="metric-caption">{caption}</p>
-            </section>)}
+        <div className={`metrics-grid${wideMetrics ? ' metrics-grid--wide-values' : ''}`} aria-busy={loading}>
+            {metrics.map(([label, value, caption, icon], index) => {
+                const formattedValue = formatMoney(value);
+                return <section key={label} className={`metric-card${index === 0 ? ' metric-featured' : ''}`}>
+                    <h2>{label}</h2><span className="metric-icon"><Icon name={icon} size={18} /></span>
+                    <p className={`metric-value${formattedValue.length > 13 ? ' metric-value-long' : ''}${label === 'Unrealized P&L' && value != null ? value < 0 ? ' value-negative' : value > 0 ? ' value-positive' : '' : ''}`}>{formattedValue}</p>
+                    <p className="metric-caption">{caption}</p>
+                </section>;
+            })}
         </div>
         {account?.valuation_estimated && <p className="notice notice-warning">Net account value includes estimates at entry prices where a market quote is unavailable.</p>}
         <div className="portfolio-grid">

@@ -97,10 +97,12 @@ button, a, input, select { transition: background-color .16s, border-color .16s,
 .section-label { font-size: 12px; font-weight: 600; }
 .snapshot-time { color: #62736d; font-size: 11px; margin-left: 14px; }
 .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 15px; margin-bottom: 24px; }
+.metrics-grid.metrics-grid--wide-values { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); }
 .metric-card { position: relative; padding: 22px 18px; border: 1px solid #e0e8e2; background: #fff; border-radius: 12px; box-shadow: 0 3px 10px #122c2105; }
 .metric-card h2 { font-size: 11px; font-weight: 550; color: #5a7469; padding-right: 21px; margin: 0; text-align: left; }
 .metric-icon { color: #6a8a7b; position: absolute; top: 20px; right: 17px; }
-.metric-value { font-size: clamp(21px, 2vw, 31px); letter-spacing: -1px; line-height: 1.4; font-weight: 650; margin: 17px 0 8px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.metric-value { font-size: clamp(21px, 2vw, 31px); letter-spacing: -1px; line-height: 1.4; font-weight: 650; margin: 17px 0 8px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.metric-value.metric-value-long { font-size: 21px; }
 .metric-caption { font-size: 11px; color: #62736d; }
 .metric-featured { background: #183f32; border-color: #183f32; color: #fff; }
 .metric-featured h2, .metric-featured .metric-caption, .metric-featured .metric-icon { color: #c1d9ca; }

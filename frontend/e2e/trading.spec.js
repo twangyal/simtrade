@@ -239,6 +239,45 @@ async function fillLocalDemoOrders(page, orders) {
   });
 }
 
+async function expectCurrencyFits(amount, container, label) {
+  await expect(amount).toBeVisible();
+  const content = await container.evaluate((element) => {
+    const bounds = element.getBoundingClientRect();
+    const style = getComputedStyle(element);
+    return {
+      left: bounds.left + parseFloat(style.borderLeftWidth) + parseFloat(style.paddingLeft),
+      right: bounds.right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight),
+      top: bounds.top + parseFloat(style.borderTopWidth) + parseFloat(style.paddingTop),
+      bottom: bounds.bottom - parseFloat(style.borderBottomWidth) - parseFloat(style.paddingBottom),
+    };
+  });
+  const fragments = await amount.evaluate((element) => {
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    return [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0)
+      .map(({ top, bottom, left, right }) => ({ top, bottom, left, right }));
+  });
+  expect(fragments.length, `${label} must have visible text`).toBeGreaterThan(0);
+  const lineTops = fragments.map(({ top }) => top);
+  expect(Math.max(...lineTops) - Math.min(...lineTops), `${label} must remain on one line`).toBeLessThanOrEqual(1);
+  for (const fragment of fragments) {
+    expect(fragment.left, `${label} must fit inside its container content`).toBeGreaterThanOrEqual(content.left - 1);
+    expect(fragment.right, `${label} must fit inside its container content`).toBeLessThanOrEqual(content.right + 1);
+    expect(fragment.top, `${label} must fit inside its container content`).toBeGreaterThanOrEqual(content.top - 1);
+    expect(fragment.bottom, `${label} must fit inside its container content`).toBeLessThanOrEqual(content.bottom + 1);
+  }
+}
+
+async function expectAccountMetricsFit(page) {
+  for (const label of ['Net Account Value', 'Cash Balance', 'Unrealized P&L', 'Short Liability']) {
+    const card = page.locator('section').filter({ has: page.getByRole('heading', { name: label, exact: true }) });
+    await expect(card).toHaveCount(1);
+    const amount = card.getByText(/^-?\$\d{1,3}(?:,\d{3})*\.\d{2}$/);
+    await expect(amount).toHaveCount(1);
+    await expectCurrencyFits(amount, card, `${label} amount`);
+  }
+}
+
 async function expectMixedExposure(page, holdings) {
   const money = (value) => new Intl.NumberFormat('en-US', {
     style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2,
@@ -274,25 +313,12 @@ async function expectMixedExposure(page, holdings) {
   }
   // A box can fit while its currency text wraps mid-number. Measure actual text
   // fragments, including both legend amounts and long/short direction totals.
-  const panelBounds = await exposure.boundingBox();
   const currencyValues = new Set([...marked.map(({ value }) => value), long, short].map(money));
   for (const value of currencyValues) {
     const amounts = exposure.getByText(value, { exact: true });
     await expect(amounts.first()).toBeVisible();
     for (const amount of await amounts.all()) {
-      const fragments = await amount.evaluate((element) => {
-        const range = document.createRange();
-        range.selectNodeContents(element);
-        return [...range.getClientRects()].filter((rect) => rect.width > 0 && rect.height > 0)
-          .map(({ top, left, right }) => ({ top, left, right }));
-      });
-      expect(fragments.length, `${value} must have visible text`).toBeGreaterThan(0);
-      const lineTops = fragments.map(({ top }) => top);
-      expect(Math.max(...lineTops) - Math.min(...lineTops), `${value} must remain on one line`).toBeLessThanOrEqual(1);
-      for (const fragment of fragments) {
-        expect(fragment.left, `${value} must remain inside the exposure panel`).toBeGreaterThanOrEqual(panelBounds.x - 1);
-        expect(fragment.right, `${value} must remain inside the exposure panel`).toBeLessThanOrEqual(panelBounds.x + panelBounds.width + 1);
-      }
+      await expectCurrencyFits(amount, exposure, `${value} exposure`);
     }
   }
   const segments = chart.locator('[data-exposure-segment]');
@@ -557,6 +583,7 @@ test('mixed long and short exposure fits desktop, tablet, and narrow mobile layo
       await expect(opener).toBeVisible();
     }
     await captureLayout(page, testInfo, `${viewport.name}-mixed-overview`);
+    await expectAccountMetricsFit(page);
     await expectMixedExposure(page, holdings);
   }
 
@@ -596,6 +623,7 @@ test('mixed long and short exposure fits desktop, tablet, and narrow mobile layo
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await expect(page.getByRole('img', { name: 'Position exposure chart', exact: true })).toBeVisible();
     await captureLayout(page, testInfo, `${viewport.name}-large-exposure`);
+    await expectAccountMetricsFit(page);
     await expectMixedExposure(page, largeHoldings);
   }
 });
