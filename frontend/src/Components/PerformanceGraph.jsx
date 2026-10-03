@@ -1,11 +1,10 @@
-import React from 'react';
 import Highcharts from 'highcharts';
 import HighchartsReact from 'highcharts-react-official';
 
 const PerformanceGraph = () => {
     const options = {
         title: {
-            text: 'Portfolio Performance'
+            text: 'Example Portfolio Performance'
         },
         xAxis: {
             categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -16,7 +15,7 @@ const PerformanceGraph = () => {
             }
         },
         series: [{
-            name: 'Portfolio',
+            name: 'Demonstration portfolio',
             data: [70000, 75000, 72000, 80000, 85000, 90000, 95000, 98000, 99000, 105000, 107000, 110000],
             color: '#4A90E2'
         }]
@@ -24,6 +23,7 @@ const PerformanceGraph = () => {
 
     return (
         <div className="bg-white p-6 rounded-lg shadow-md">
+            <p className="mb-4 text-sm text-gray-600">Demonstration data only. This chart does not show your account performance.</p>
             <HighchartsReact highcharts={Highcharts} options={options} />
         </div>
     );

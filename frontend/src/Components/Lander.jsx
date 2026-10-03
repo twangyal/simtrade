@@ -1,4 +1,3 @@
-import React from 'react';
 import Header from './LanderComponents/Header';
 import Hero from './LanderComponents/Hero';
 import Features from './LanderComponents/Features';

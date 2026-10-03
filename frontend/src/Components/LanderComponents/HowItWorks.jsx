@@ -1,5 +1,3 @@
-import React from 'react';
-
 function HowItWorks() {
     return (
         <section id="how-it-works" className="py-20 bg-white">
@@ -13,11 +11,11 @@ function HowItWorks() {
             </div>
             <div className="w-full md:w-1/4 p-6 text-center">
             <h3 className="text-xl font-semibold mb-4">Set Up Your Portfolio</h3>
-            <p>Choose your starting capital and select the stocks or assets you want to trade.</p>
+            <p>Start with virtual funds and choose the supported stocks you want to trade.</p>
             </div>
             <div className="w-full md:w-1/4 p-6 text-center">
             <h3 className="text-xl font-semibold mb-4">Simulate Trades</h3>
-            <p>Make trades based on real-time data and see how your decisions play out.</p>
+            <p>Place simulated buy and sell orders using available market quotes.</p>
             </div>
             <div className="w-full md:w-1/4 p-6 text-center">
             <h3 className="text-xl font-semibold mb-4">Review Performance</h3>

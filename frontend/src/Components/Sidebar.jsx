@@ -1,4 +1,4 @@
-import React from 'react';
+import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 
 const Sidebar = ({ isOpen, onClose }) => {
@@ -16,7 +16,7 @@ const Sidebar = ({ isOpen, onClose }) => {
     return (
         <div className={`fixed top-0 right-0 w-64 h-full bg-white shadow-lg transform ${isOpen ? 'translate-x-0' : 'translate-x-full'} transition-transform duration-300 ease-in-out`}>
             <div className="p-6">
-                <button className="absolute top-4 right-4 text-xl" onClick={onClose}>X</button>
+                <button aria-label="Close navigation" className="absolute top-4 right-4 text-xl" onClick={onClose}>X</button>
                 <div className="mt-8">
                     <button onClick={() => handleNavigate('/dashboard')} className="block w-full text-left py-2 px-4 hover:bg-gray-200">Home</button>
                     <button onClick={() => handleNavigate('/trade')} className="block w-full text-left py-2 px-4 hover:bg-gray-200">Trade</button>
@@ -26,6 +26,11 @@ const Sidebar = ({ isOpen, onClose }) => {
             </div>
         </div>
     );
+};
+
+Sidebar.propTypes = {
+    isOpen: PropTypes.bool.isRequired,
+    onClose: PropTypes.func.isRequired,
 };
 
 export default Sidebar;

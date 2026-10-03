@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import Info from "./Info";
-import DropdownMenu from "./Dropdown";  
+import DropdownMenu from "./dropdown";
 import TradeControls from "./TradeControls";
 import Sidebar from "./Sidebar";
 
@@ -14,7 +14,6 @@ function Trade() {
 
     const handleOptionSelect = (option) => {
         setSelectedOption(option);
-        console.log('Selected option:', option);
     };
 
     return (
@@ -23,8 +22,8 @@ function Trade() {
             <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
             {/* Sidebar Toggle Button */}
-            <button 
-                className={`fixed top-4 right-4 text-2xl text-gray-600 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'opacity-0' : 'opacity-100'}`} 
+            <button aria-label="Open navigation" aria-expanded={sidebarOpen}
+                className={`fixed top-4 right-4 text-2xl text-gray-600 transition-transform duration-300 ease-in-out ${sidebarOpen ? 'invisible' : 'opacity-100'}`}
                 onClick={toggleSidebar}
             >
                 &#9776;

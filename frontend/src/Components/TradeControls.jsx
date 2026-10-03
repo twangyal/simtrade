@@ -1,86 +1,68 @@
-import React, { useState } from "react";
-import axios from "axios";
+import { useRef, useState } from 'react';
+import PropTypes from 'prop-types';
+import api, { authHeaders, errorMessage } from '../api';
 
 function TradeControls({ selectedOption }) {
-    const [shares, setShares] = useState(0);
-    const [error, setError] = useState(null);
+    const [shares, setShares] = useState('');
+    const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
+    const [pending, setPending] = useState(null);
+    const submitting = useRef(false);
 
-    const handleSharesChange = (event) => {
-        setShares(event.target.value);
-    };
-
-    const handleBuy = async () => {
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-            setError('User not authenticated');
+    const submitOrder = async (side) => {
+        if (submitting.current) return;
+        setError('');
+        setSuccess('');
+        const quantity = Number(shares);
+        if (!shares.trim() || !Number.isFinite(quantity) || quantity <= 0) {
+            setError('Enter a finite quantity greater than zero.');
             return;
         }
         try {
-            const response = await axios.post('http://localhost:8000/BUY', {
-                symbol: selectedOption,
-                quantity: shares
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            console.log(response.data);
+            const headers = authHeaders();
+            submitting.current = true;
+            setPending(side);
+            await api.post(`/${side}`, { symbol: selectedOption, quantity }, { headers });
+            setSuccess(`${side === 'BUY' ? 'Buy' : 'Sell'} order for ${quantity} ${selectedOption} completed.`);
+            setShares('');
         } catch (error) {
-            console.error(error);
-            setError('Failed to buy shares');
-        }
-    };
-
-    const handleSell = async () => {
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-            setError('User not authenticated');
-            return;
-        }
-        try {
-            const response = await axios.post('http://localhost:8000/SELL', {
-                symbol: selectedOption,
-                quantity: shares
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            console.log(response.data);
-        } catch (error) {
-            console.error(error);
-            setError('Failed to sell shares');
+            setError(errorMessage(error, 'Could not confirm the order. Check trade history before trying again.'));
+        } finally {
+            submitting.current = false;
+            setPending(null);
         }
     };
 
     return (
-        <div className="flex flex-col lg:flex-row items-center lg:items-start lg:justify-between p-4 bg-white shadow-md rounded-lg max-w-md mx-auto">
-            <div className="flex flex-col w-full lg:w-auto space-y-4 lg:space-y-0 lg:space-x-4">
-                <input 
-                    type="number" 
-                    value={shares} 
-                    onChange={handleSharesChange} 
-                    placeholder="Enter number of shares"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <div className="flex flex-col lg:flex-row w-full lg:w-auto gap-4">
-                    <button 
-                        onClick={handleBuy} 
-                        className="w-full lg:w-auto bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        Buy
-                    </button>
-                    <button 
-                        onClick={handleSell} 
-                        className="w-full lg:w-auto bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500"
-                    >
-                        Sell
-                    </button>
-                </div>
+        <div className="p-4 bg-white shadow-md rounded-lg w-full max-w-md mx-auto" aria-busy={Boolean(pending)}>
+            <label htmlFor="trade-quantity" className="block font-medium mb-2">Quantity of {selectedOption}</label>
+            <input
+                id="trade-quantity"
+                type="number"
+                min="0"
+                step="any"
+                value={shares}
+                onChange={(event) => { setShares(event.target.value); setError(''); setSuccess(''); }}
+                disabled={Boolean(pending)}
+                placeholder="Enter quantity"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-sm text-gray-600 mt-2">Fractional quantities are supported.</p>
+            <div className="flex gap-4 mt-4">
+                <button onClick={() => submitOrder('BUY')} disabled={Boolean(pending)}
+                    className="bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 disabled:opacity-50">
+                    {pending === 'BUY' ? 'Buying…' : 'Buy'}
+                </button>
+                <button onClick={() => submitOrder('SELL')} disabled={Boolean(pending)}
+                    className="bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600 disabled:opacity-50">
+                    {pending === 'SELL' ? 'Selling…' : 'Sell'}
+                </button>
             </div>
-            {error && <p className="text-red-500 mt-4 lg:mt-0">{error}</p>}
+            {error && <p role="alert" className="text-red-600 mt-4">{error}</p>}
+            {success && <p role="status" className="text-green-700 mt-4">{success}</p>}
         </div>
     );
 }
 
+TradeControls.propTypes = { selectedOption: PropTypes.string.isRequired };
 export default TradeControls;
