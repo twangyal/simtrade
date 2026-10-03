@@ -4,7 +4,7 @@ SimTrade is a paper-trading app with a React/Vite frontend and a FastAPI backend
 
 ## Local setup
 
-Use Python 3.12, Node.js 22.12+ (or 24+), npm, and a PostgreSQL database. Installing the pinned `psycopg2` package may also require a C compiler and PostgreSQL development headers (`libpq-dev` on Debian/Ubuntu).
+Use Python 3.12, a supported Node.js version (22.22.2+ on 22.x, 24.15.0+ on 24.x, or 26+), npm, and a PostgreSQL database. Installing the pinned `psycopg2` package may also require a C compiler and PostgreSQL development headers (`libpq-dev` on Debian/Ubuntu).
 
 Run these commands from the repository root:
 
