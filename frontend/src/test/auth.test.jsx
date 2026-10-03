@@ -44,6 +44,28 @@ it('prevents repeated login submissions while awaiting the token', async () => {
   expect(localStorage.getItem('accessToken')).toBe('new-token');
 });
 
+it('preserves leading and trailing spaces in an existing account username', async () => {
+  axios.post.mockResolvedValueOnce({ data: { access_token: 'existing-account-token' } });
+  renderAuth();
+  fireEvent.change(screen.getByLabelText('Username:'), { target: { value: ' Trader ' } });
+  fireEvent.change(screen.getByLabelText('Password:'), { target: { value: 'password123' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+
+  expect(await screen.findByRole('heading', { name: 'Account dashboard' })).toBeTruthy();
+  expect(axios.post).toHaveBeenCalledWith('/login',
+    { username: ' Trader ', password: 'password123' }, expect.objectContaining({ signal: expect.any(AbortSignal) }));
+});
+
+it('rejects a whitespace-only username without sending a login request', () => {
+  renderAuth();
+  fireEvent.change(screen.getByLabelText('Username:'), { target: { value: '   ' } });
+  fireEvent.change(screen.getByLabelText('Password:'), { target: { value: 'password123' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+
+  expect(axios.post).not.toHaveBeenCalled();
+  expect(screen.getByRole('alert').textContent).toBe('Enter your username and password.');
+});
+
 it('shows server registration errors', async () => {
   axios.post.mockRejectedValueOnce({ response: { data: { detail: 'Username already registered' } } });
   renderAuth('/register');

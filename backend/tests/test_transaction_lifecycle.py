@@ -14,7 +14,7 @@ with patch.dict(os.environ, {
     "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
     "SECRET_KEY": "transaction-lifecycle-tests-only-signing-key-more-than-32-bytes",
     "MARKET_DATA_ENABLED": "false",
-}):
+}), patch("dotenv.load_dotenv"):
     import main
     from database import Base
     from market import QuoteBook

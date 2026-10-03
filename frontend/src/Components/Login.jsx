@@ -18,7 +18,7 @@ const Login = () => {
             setError('Enter your username and password.');
             return;
         }
-        submit('/login', { username: username.trim(), password }, (response) => {
+        submit('/login', { username, password }, (response) => {
             setSession(response.data.access_token);
             const requestedPath = location.state?.from;
             const destination = ['/dashboard', '/trade', '/trade-history'].includes(requestedPath) ? requestedPath : '/dashboard';
