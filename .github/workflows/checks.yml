@@ -1,0 +1,71 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: simtrade
+          POSTGRES_PASSWORD: test-only-simtrade
+          POSTGRES_DB: simtrade_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U simtrade -d simtrade_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            backend/dependencies.txt
+            backend/test-dependencies.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install backend dependencies
+        run: python -m pip install -r backend/dependencies.txt -r backend/test-dependencies.txt
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Test backend
+        run: python -m unittest discover -s backend/tests
+        env:
+          PYTHONPATH: backend
+          PYTHONDONTWRITEBYTECODE: "1"
+          SIMTRADE_TEST_POSTGRES_URL: postgresql://simtrade:test-only-simtrade@localhost:5432/simtrade_test
+
+      - name: Test frontend
+        run: npm test
+        working-directory: frontend
+
+      - name: Lint frontend
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Build frontend
+        run: npm run build
+        working-directory: frontend
