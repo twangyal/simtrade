@@ -53,7 +53,7 @@ export function selectQuoteRange(points, range) {
   return points.filter((point) => point.time >= cutoff);
 }
 
-/** Endpoints, extrema and movement use only the observations in the supplied range. */
+/** Use only observed prices; an overflowing percentage is unavailable, not missing history. */
 export function quoteRangeStats(points) {
   if (points.length === 0) return null;
   let low = Infinity;
@@ -67,6 +67,6 @@ export function quoteRangeStats(points) {
   const last = points.at(-1).price;
   const change = last - first;
   const percent = (change / first) * 100;
-  if (!Number.isFinite(change) || !Number.isFinite(percent)) return null;
-  return { first, last, low, high, change, percent };
+  if (!Number.isFinite(change)) return null;
+  return { first, last, low, high, change, percent: Number.isFinite(percent) ? percent : null };
 }

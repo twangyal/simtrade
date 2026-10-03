@@ -177,9 +177,22 @@ describe('observed range statistics', () => {
       .toEqual({ first: 100, last: 100, low: 100, high: 110, change: 0, percent: 0 });
   });
 
-  it('never returns fictional numeric statistics for invalid or overflowing observations', () => {
+  it('rejects invalid observations instead of manufacturing statistics', () => {
     expect(quoteRangeStats([{ time: 1, price: 0 }, { time: 2, price: 100 }])).toBeNull();
     expect(quoteRangeStats([{ time: 1, price: 100 }, { time: 2, price: Infinity }])).toBeNull();
-    expect(quoteRangeStats([{ time: 1, price: Number.MIN_VALUE }, { time: 2, price: Number.MAX_VALUE }])).toBeNull();
+    expect(quoteRangeStats([{ time: 1, price: NaN }, { time: 2, price: 100 }])).toBeNull();
+  });
+
+  it.each([[1e-310, 1], [Number.MIN_VALUE, 1_000_000]])(
+    'preserves real prices and change from %s to %s when only percentage overflows', (first, last) => {
+      expect(quoteRangeStats([{ time: 1, price: first }, { time: 2, price: last }]))
+        .toEqual({ first, last, low: first, high: last, change: last, percent: null });
+    },
+  );
+
+  it('still calculates finite percentage changes for tiny prices', () => {
+    expect(quoteRangeStats([{ time: 1, price: Number.MIN_VALUE }, { time: 2, price: Number.MIN_VALUE * 2 }]))
+      .toEqual({ first: Number.MIN_VALUE, last: Number.MIN_VALUE * 2, low: Number.MIN_VALUE,
+        high: Number.MIN_VALUE * 2, change: Number.MIN_VALUE, percent: 100 });
   });
 });

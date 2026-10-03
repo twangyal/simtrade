@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { quoteRangeStats, selectQuoteRange } from '../quotes';
 import { formatQuotePrice, formatReceiptTime } from '../quoteFormat';
 import { quoteAxis, formatAxisPrice } from '../quoteAxis';
+import { quoteTimeLabels } from '../quoteTimeAxis';
 import './MarketQuoteChart.css';
 
 const HEIGHT = 320;
@@ -30,7 +31,7 @@ function geometry(points, width, stats) {
   const grid = labels.map((label, index) => ({
     y: TOP + (index / (axis.ticks.length - 1)) * (BOTTOM - TOP), label,
   }));
-  return { plotted, line, area, grid, right };
+  return { plotted, line, area, grid, right, timeLabels: quoteTimeLabels(points, plotted) };
 }
 
 export default function MarketQuoteChart({ points, symbol }) {
@@ -73,7 +74,7 @@ export default function MarketQuoteChart({ points, symbol }) {
   };
 
   const signedChange = stats ? `${stats.change > 0 ? '+' : ''}${formatQuotePrice(stats.change)}` : '';
-  const signedPercent = stats ? `${stats.percent > 0 ? '+' : ''}${stats.percent.toFixed(2)}%` : '';
+  const signedPercent = stats?.percent != null ? `${stats.percent > 0 ? '+' : ''}${stats.percent.toFixed(2)}%` : 'Percentage unavailable';
 
   return (
     <section className="market-chart" aria-label={`${symbol} received quote history`}>
@@ -123,9 +124,9 @@ export default function MarketQuoteChart({ points, symbol }) {
             <circle className="market-chart-point-halo" cx={activePosition.x} cy={activePosition.y} r="9" />
             <circle className="market-chart-point" cx={activePosition.x} cy={activePosition.y} r="4" />
           </>}
-          {shape && (visible.length === 1 ? [0] : [0, Math.floor((visible.length - 1) / 2), visible.length - 1].filter((index, position, all) => all.indexOf(index) === position)).map((index) => (
-            <text key={visible[index].time} className="market-chart-axis" x={shape.plotted[index].x} y={HEIGHT - 12}
-              textAnchor={visible.length === 1 ? 'middle' : index === 0 ? 'start' : index === visible.length - 1 ? 'end' : 'middle'}>{formatReceiptTime(visible[index].time)}</text>
+          {shape?.timeLabels.map(({ time, x, anchor, label }) => (
+            <text key={time} className="market-chart-axis" x={x} y={HEIGHT - 12}
+              textAnchor={anchor}>{label}</text>
           ))}
         </svg>
         {!visible.length && <div className="market-chart-empty"><span className="market-chart-empty-mark" aria-hidden="true">↗</span><strong>Waiting for the first quote</strong><p>Your chart begins when a price arrives.</p></div>}

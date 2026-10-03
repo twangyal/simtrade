@@ -63,3 +63,30 @@ it('renders flat prices with finite geometry and a neutral zero change', () => {
   expect(screen.getByTestId('quote-price-line').getAttribute('d')).not.toMatch(/NaN|Infinity/);
   expect(screen.getByLabelText('Observed range change').textContent).toContain('0.00');
 });
+
+it('keeps tiny received prices nonzero in the readout, inspection, and change', () => {
+  render(<MarketQuoteChart points={[{ time: 1_000, price: 1.2e-6 }, { time: 2_000, price: 1.3e-6 }]} symbol="AAPL" />);
+  const inspectedPrice = screen.getByRole('slider').getAttribute('aria-valuetext').split(' at ')[0];
+  expect(Number(inspectedPrice)).toBeGreaterThan(0);
+  expect(screen.getByLabelText('Observed range change').textContent).not.toContain('+0.00');
+  expect(screen.getByTestId('quote-price-line').getAttribute('d')).not.toMatch(/NaN|Infinity/);
+});
+
+it('keeps the finite price trace when only percentage change overflows', () => {
+  render(<MarketQuoteChart points={[{ time: 1_000, price: 1e-308 }, { time: 2_000, price: 1 }]} symbol="AAPL" />);
+  expect(screen.getByTestId('quote-price-line').getAttribute('d')).not.toMatch(/NaN|Infinity/);
+  expect(screen.getByLabelText('Observed range change').textContent).toContain('+1.00');
+  expect(screen.getByLabelText('Observed range change').textContent).toContain('Percentage unavailable');
+  expect(screen.queryByText('Collecting ticks')).toBeNull();
+  expect(screen.getByRole('img').getAttribute('data-point-count')).toBe('2');
+});
+
+it('omits an overlapping timestamp after a reconnect gap while keeping all observed points', () => {
+  render(<MarketQuoteChart points={[{ time: 1_000, price: 100 }, { time: 2_000, price: 101 }, { time: 61_000, price: 102 }]} symbol="AAPL" />);
+  const chart = screen.getByRole('img');
+  const timeLabels = [...chart.querySelectorAll('text[y="308"]')];
+  expect(timeLabels).toHaveLength(2);
+  expect(timeLabels.map((label) => label.getAttribute('text-anchor'))).toEqual(['start', 'end']);
+  expect(chart.getAttribute('data-point-count')).toBe('3');
+  expect(screen.getByTestId('quote-price-line')).toBeTruthy();
+});
