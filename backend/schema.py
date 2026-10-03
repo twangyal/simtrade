@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from limits import MAX_QUANTITY, QUANTITY_DECIMAL_PLACES
 from pydantic import BaseModel, Field, field_validator
@@ -55,6 +55,14 @@ class Trade(BaseModel):
     price: float
     trade_type: str
     timestamp: datetime
+
+    @field_validator('timestamp')
+    @classmethod
+    def normalize_timestamp_utc(cls, value):
+        # Existing database rows store naive UTC, regardless of server timezone.
+        if value.utcoffset() is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
 
 class TradePagination(BaseModel):
