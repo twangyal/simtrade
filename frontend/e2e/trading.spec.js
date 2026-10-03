@@ -744,8 +744,8 @@ test('controlled scientific quote frames remain readable and keyboard inspectabl
   expect(await inspector.getAttribute('aria-valuetext')).toContain(frames[1].price.toExponential());
 
   const final = frames.at(-1);
-  const bid = panel.locator('.quote-spread div').filter({ has: panel.getByText('Bid', { exact: true }) }).locator('dd');
-  const ask = panel.locator('.quote-spread div').filter({ has: panel.getByText('Ask', { exact: true }) }).locator('dd');
+  const bid = panel.locator('.quote-spread div').filter({ has: page.getByText('Bid', { exact: true }) }).locator('dd');
+  const ask = panel.locator('.quote-spread div').filter({ has: page.getByText('Ask', { exact: true }) }).locator('dd');
   for (const viewport of [
     { name: 'narrow-mobile', width: 320, height: 812 },
     { name: 'mobile', width: 390, height: 844 },
