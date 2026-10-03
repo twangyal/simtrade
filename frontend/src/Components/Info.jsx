@@ -12,36 +12,64 @@ function Info({ instrumentSelect }) {
 
   useEffect(() => {
     let active = true;
+    let currentSocket = null;
+    let reconnectTimer;
+    let retryDelay = 1000;
     setData(null);
     setHistory([]);
     setStatus('Connecting to market data…');
-    const ws = new WebSocket(WS_URL);
-    ws.onopen = () => {
-      if (active) setStatus('Waiting for a quote…');
-    };
-    ws.onmessage = (event) => {
+
+    const retry = (message) => {
       if (!active) return;
+      setStatus(`${message} Reconnecting…`);
+      reconnectTimer = setTimeout(connect, retryDelay);
+      retryDelay = Math.min(retryDelay * 2, 30000);
+    };
+    function connect() {
+      if (!active) return;
+      setStatus('Connecting to market data…');
+      let ws;
       try {
-        const quote = JSON.parse(event.data);
-        if (quote.symbol !== instrumentSelect) return;
-        const price = Number(Array.isArray(quote.price) ? quote.price[0] : quote.price);
-        if (!Number.isFinite(price) || price <= 0) return;
-        setData(quote);
-        setStatus('Last received quote');
-        setHistory((points) => [...points.slice(-99), [Date.now(), price]]);
+        ws = new WebSocket(WS_URL);
       } catch {
-        setStatus('Unable to read market data. Waiting for the next quote…');
+        retry('Market data unavailable.');
+        return;
       }
-    };
-    ws.onclose = () => {
-      if (active) setStatus('Market data disconnected. Refresh to reconnect.');
-    };
-    ws.onerror = () => {
-      if (active) setStatus('Market data unavailable. Refresh to reconnect.');
-    };
+      currentSocket = ws;
+      const isCurrent = () => active && currentSocket === ws;
+      ws.onopen = () => {
+        if (isCurrent()) setStatus('Waiting for a quote…');
+      };
+      ws.onmessage = (event) => {
+        if (!isCurrent()) return;
+        try {
+          const quote = JSON.parse(event.data);
+          if (quote.symbol !== instrumentSelect) return;
+          const price = Number(Array.isArray(quote.price) ? quote.price[0] : quote.price);
+          if (!Number.isFinite(price) || price <= 0) return;
+          retryDelay = 1000;
+          setData(quote);
+          setStatus('Last received quote');
+          setHistory((points) => [...points.slice(-99), [Date.now(), price]]);
+        } catch {
+          setStatus('Unable to read market data. Waiting for the next quote…');
+        }
+      };
+      const disconnect = (message) => {
+        if (!isCurrent()) return;
+        // Ignore error/close pairs and late callbacks from this replaced socket.
+        currentSocket = null;
+        ws.close();
+        retry(message);
+      };
+      ws.onclose = () => disconnect('Market data disconnected.');
+      ws.onerror = () => disconnect('Market data unavailable.');
+    }
+    connect();
     return () => {
       active = false;
-      ws.close();
+      clearTimeout(reconnectTimer);
+      currentSocket?.close();
     };
   }, [instrumentSelect]);
 
