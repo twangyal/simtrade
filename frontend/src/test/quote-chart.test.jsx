@@ -64,6 +64,23 @@ it('renders flat prices with finite geometry and a neutral zero change', () => {
   expect(screen.getByLabelText('Observed range change').textContent).toContain('0.00');
 });
 
+it.each([
+  [100, 101, 102],
+  [4.5e-287, 4.500000000000001e-287, 4.5000000000000013e-287],
+])('aligns equal guide and quote prices across %s, %s and %s', (low, middle, high) => {
+  render(<MarketQuoteChart points={[
+    { time: 1_000, price: low }, { time: 2_000, price: middle }, { time: 3_000, price: high },
+  ]} symbol="AAPL" />);
+  fireEvent.change(screen.getByRole('slider'), { target: { value: '1' } });
+  const chart = screen.getByRole('img');
+  const guideLabel = [...chart.querySelectorAll('text')]
+    .find((label) => Number(label.textContent.replaceAll(',', '')) === middle);
+  expect(guideLabel).toBeTruthy();
+  const guideY = Number(guideLabel.parentElement.querySelector('line').getAttribute('y1'));
+  const pointY = Number(chart.querySelector('.market-chart-point').getAttribute('cy'));
+  expect(guideY).toBeCloseTo(pointY, 8);
+});
+
 it('keeps tiny received prices nonzero in the readout, inspection, and change', () => {
   render(<MarketQuoteChart points={[{ time: 1_000, price: 1.2e-6 }, { time: 2_000, price: 1.3e-6 }]} symbol="AAPL" />);
   const inspectedPrice = screen.getByRole('slider').getAttribute('aria-valuetext').split(' at ')[0];

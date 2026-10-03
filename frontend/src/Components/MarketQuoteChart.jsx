@@ -18,18 +18,20 @@ function geometry(points, width, stats) {
   const { low, high } = axis;
   const firstTime = points[0].time;
   const duration = points.at(-1).time - firstTime;
-  const labels = [...axis.ticks].reverse().map((price) => formatAxisPrice(price, axis.step));
+  const ticks = [...axis.ticks].reverse();
+  const labels = ticks.map((price) => formatAxisPrice(price, axis.step));
   const axisWidth = Math.max(RIGHT, ...labels.map((label) => label.length * 5.7 + 22));
   const right = Math.max(LEFT + 40, width - axisWidth);
+  const priceY = (price) => BOTTOM - ((price - low) / (high - low)) * (BOTTOM - TOP);
   const position = (point) => ({
     x: duration ? LEFT + ((point.time - firstTime) / duration) * (right - LEFT) : (LEFT + right) / 2,
-    y: BOTTOM - ((point.price - low) / (high - low)) * (BOTTOM - TOP),
+    y: priceY(point.price),
   });
   const plotted = points.map(position);
   const line = plotted.map(({ x, y }, index) => `${index ? 'L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
   const area = `${line} L${plotted.at(-1).x.toFixed(2)},${BOTTOM} L${plotted[0].x.toFixed(2)},${BOTTOM} Z`;
-  const grid = labels.map((label, index) => ({
-    y: TOP + (index / (axis.ticks.length - 1)) * (BOTTOM - TOP), label,
+  const grid = ticks.map((price, index) => ({
+    y: priceY(price), label: labels[index],
   }));
   return { plotted, line, area, grid, right, timeLabels: quoteTimeLabels(points, plotted) };
 }
