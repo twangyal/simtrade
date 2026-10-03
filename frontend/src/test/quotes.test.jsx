@@ -47,3 +47,39 @@ it('ignores missing or invalid quotes and recovers after a malformed message', (
   expect(screen.getByText('125')).toBeTruthy();
   expect(screen.getByRole('status').textContent).toBe('Last received quote');
 });
+
+it('labels a received demo quote as synthetic even when the connection reports an error', () => {
+  render(<Info instrumentSelect="AAPL" />);
+  act(() => sockets[0].onmessage({ data: JSON.stringify({ symbol: 'AAPL', price: 123, source: 'demo' }) }));
+
+  expect(screen.getByRole('note').textContent).toMatch(/demo.*synthetic.*not live/i);
+  expect(screen.getByText('123')).toBeTruthy();
+
+  act(() => sockets[0].onerror());
+  expect(screen.getByRole('note').textContent).toMatch(/demo.*synthetic.*not live/i);
+});
+
+it('clears the demo notice when changing instruments until another demo quote arrives', () => {
+  const { rerender } = render(<Info instrumentSelect="AAPL" />);
+  act(() => sockets[0].onmessage({ data: JSON.stringify({ symbol: 'AAPL', price: 123, source: 'demo' }) }));
+  expect(screen.getByRole('note')).toBeTruthy();
+
+  rerender(<Info instrumentSelect="QQQ" />);
+  expect(screen.queryByRole('note')).toBeNull();
+
+  act(() => sockets[0].onmessage({ data: JSON.stringify({ symbol: 'AAPL', price: 124, source: 'demo' }) }));
+  expect(screen.queryByRole('note')).toBeNull();
+
+  act(() => sockets[1].onmessage({ data: JSON.stringify({ symbol: 'QQQ', price: 456, source: 'demo' }) }));
+  expect(screen.getByRole('note').textContent).toMatch(/demo.*synthetic.*not live/i);
+});
+
+it('removes the demo notice when the next quote has a live source', () => {
+  render(<Info instrumentSelect="AAPL" />);
+  act(() => sockets[0].onmessage({ data: JSON.stringify({ symbol: 'AAPL', price: 123, source: 'demo' }) }));
+  expect(screen.getByRole('note')).toBeTruthy();
+
+  act(() => sockets[0].onmessage({ data: JSON.stringify({ symbol: 'AAPL', price: 124, source: 'live' }) }));
+  expect(screen.queryByRole('note')).toBeNull();
+  expect(screen.getByText('124')).toBeTruthy();
+});

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import api, { authHeaders, errorMessage, formatMoney } from '../api';
 import Sidebar from './Sidebar';
 import PerformanceGraph from './PerformanceGraph';
+import MarketStatus from './MarketStatus';
 
 const Dashboard = () => {
     const [account, setAccount] = useState(null);
@@ -43,6 +44,7 @@ const Dashboard = () => {
                 onClick={() => setSidebarOpen(true)}>&#9776;</button>
             <div className="max-w-7xl mx-auto">
                 <h1 className="text-3xl font-bold mb-6">{account ? `Welcome, ${account.username}` : 'Dashboard'}</h1>
+                <MarketStatus />
                 {loading && <p role="status" className="mb-4">Loading your account…</p>}
                 {errors.map((error) => <p key={error} role="alert" className="text-red-600 mb-4">{error}</p>)}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">

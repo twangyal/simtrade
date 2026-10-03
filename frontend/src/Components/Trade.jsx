@@ -3,6 +3,7 @@ import Info from "./Info";
 import DropdownMenu from "./dropdown";
 import TradeControls from "./TradeControls";
 import Sidebar from "./Sidebar";
+import MarketStatus from "./MarketStatus";
 
 function Trade() {
     const [selectedOption, setSelectedOption] = useState("BTC/USD");
@@ -30,6 +31,7 @@ function Trade() {
             </button>
         <div className="min-h-screen bg-gray-100 p-6 flex flex-col items-center">
             <div className="w-full max-w-4xl bg-white shadow-lg rounded-lg p-6">
+                <MarketStatus selectedSymbol={selectedOption} />
                 {/* Dropdown Menu Section */}
                 <div className="mb-6">
                     <DropdownMenu onOptionSelect={handleOptionSelect} />

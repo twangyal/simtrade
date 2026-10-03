@@ -21,7 +21,7 @@ Create a PostgreSQL database and edit `backend/api.env`:
 ```dotenv
 SQLALCHEMY_DATABASE_URI=postgresql://your_user:your_password@localhost:5432/simtrade
 SECRET_KEY=
-MARKET_DATA_ENABLED=false
+MARKET_DATA_MODE=disabled
 ```
 
 Replace the signing-key placeholder with a newly generated secret, for example the output of:
@@ -60,8 +60,9 @@ Backend values belong in `backend/api.env` or the process environment:
 | --- | --- | --- |
 | `SQLALCHEMY_DATABASE_URI` | PostgreSQL connection URL, using the `postgresql://` scheme | Required |
 | `SECRET_KEY` | Random HS256 signing key, at least 32 bytes | Required |
-| `MARKET_DATA_ENABLED` | Set to `true` to connect to the Twelve Data quote stream | `false` |
-| `API_KEY` | Twelve Data key; required when market data is enabled | Unset |
+| `MARKET_DATA_MODE` | `disabled`, `demo` (invented offline quotes), or `live` (Twelve Data) | `disabled` |
+| `MARKET_DATA_ENABLED` | Legacy flag: `true` selects live data only when `MARKET_DATA_MODE` is unset | `false` |
+| `API_KEY` | Twelve Data key; required only in live mode | Unset |
 | `CORS_ORIGINS` | Comma-separated browser origins allowed to call the API | `http://localhost:5173,http://127.0.0.1:5173` |
 
 The frontend accepts these optional values in `frontend/.env.local`. Restart the Vite dev server after changing them; production builds embed the values at build time.
@@ -73,9 +74,22 @@ The frontend accepts these optional values in `frontend/.env.local`. Restart the
 
 Only public endpoint URLs belong in frontend configuration. Vendor credentials and the signing key stay in the backend.
 
+## Offline demo
+
+To practice without a vendor key or network service, create a separate database for demo accounts and set these values in `backend/api.env`:
+
+```dotenv
+SQLALCHEMY_DATABASE_URI=postgresql://your_user:your_password@localhost:5432/simtrade_demo
+MARKET_DATA_MODE=demo
+```
+
+Keep the same required signing-key setup, restart the API, then register a new account. The demo feed immediately seeds all supported instruments and refreshes them once per second using repeatable, invented prices. They are not observations, forecasts, or historical market data. Demo mode never creates a vendor connection or uses an API key. Do not share a database between demo and live-market accounts: switching a feed changes the prices used to value existing positions.
+
+`GET /market_status` reports the active mode, supported symbols, symbols with a fresh quote, and quote lifetime. Demo WebSocket messages include `source: "demo"`, including initial snapshots. Mode changes require an API restart.
+
 ## Quotes and accounting
 
-Market networking is disabled by default. Registration, login, and account/history views work without a vendor key, while orders return `503` until a fresh quote is available. To receive live quotes, set `MARKET_DATA_ENABLED=true` and provide `API_KEY`. The feed reconnects with bounded backoff and resubscribes after a disconnect.
+Market networking is disabled by default. Registration, login, and account/history views work without a vendor key, while orders return `503` until a fresh quote is available. To receive live quotes, set `MARKET_DATA_MODE=live` and provide `API_KEY`. The feed reconnects with bounded backoff and resubscribes after a disconnect.
 
 The market transport uses proxy-aware websockets 17.2. For the secure vendor connection, it honors `HTTPS_PROXY` or `WSS_PROXY` and respects `NO_PROXY`; `HTTP_PROXY` alone applies to plain `ws://` connections. Lowercase proxy variables take precedence. Proxy URLs may use an HTTP CONNECT endpoint. TLS certificate and hostname verification remain enabled for the vendor and for HTTPS proxy connections, using the Python runtime's configured trust roots. Transport debug logging remains disabled to keep credential-bearing URLs out of logs.
 

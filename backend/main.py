@@ -11,6 +11,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, WebSocket, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
 from database import Base, database, engine
+from demo import DemoFeed, demo_quotes
 from market import MarketFeed, QuoteBook, SUPPORTED_SYMBOLS
 from models import Portfolio, STARTING_BALANCE, User
 from limits import MAX_CASH_BALANCE, MAX_ORDER_VALUE, MAX_QUANTITY
@@ -35,19 +36,38 @@ async def broadcast_to_clients(data):
     await asyncio.gather(*(send(client) for client in tuple(connected_clients)))
 
 
+def resolve_market_mode():
+    mode = os.getenv('MARKET_DATA_MODE')
+    if mode is None:
+        mode = 'live' if os.getenv('MARKET_DATA_ENABLED', 'false').lower() == 'true' else 'disabled'
+    mode = mode.strip().lower()
+    if mode not in {'disabled', 'demo', 'live'}:
+        raise RuntimeError('MARKET_DATA_MODE must be disabled, demo, or live')
+    return mode
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global quote_book
     feed_task = None
-    enabled = os.getenv('MARKET_DATA_ENABLED', 'false').lower() == 'true'
+    mode = resolve_market_mode()
     api_key = os.getenv('API_KEY')
-    if enabled and not api_key:
-        raise RuntimeError('API_KEY is required when MARKET_DATA_ENABLED=true')
+    if mode == 'live' and not api_key:
+        raise RuntimeError('API_KEY is required for live market data')
+    quote_book = QuoteBook()
+    app.state.market_mode = mode
     # Schema initialization happens at startup, never merely by importing the API.
     await asyncio.to_thread(Base.metadata.create_all, bind=engine)
     await database.connect()
     try:
-        if enabled:
+        if mode == 'live':
             feed = MarketFeed(quote_book, broadcast_to_clients, api_key)
+            feed_task = asyncio.create_task(feed.run())
+        elif mode == 'demo':
+            # Seed before accepting requests so demo orders work immediately.
+            for quote in demo_quotes(0):
+                quote_book.update(quote)
+            feed = DemoFeed(quote_book, broadcast_to_clients)
             feed_task = asyncio.create_task(feed.run())
         yield
     finally:
@@ -62,6 +82,7 @@ async def lifespan(app: FastAPI):
                     await client.close(code=1001)
             connected_clients.clear()
             await database.disconnect()
+            app.state.market_mode = 'disabled'
 
 
 app = FastAPI(title='SimTrade API', lifespan=lifespan)
@@ -89,6 +110,8 @@ async def websocket_endpoint(websocket: WebSocket):
         for symbol in SUPPORTED_SYMBOLS:
             quote = quote_book.get(symbol, require_fresh=True)
             if quote:
+                if getattr(app.state, 'market_mode', 'disabled') == 'demo':
+                    quote['source'] = 'demo'
                 await websocket.send_json(quote)
         while True:
             await websocket.receive_text()
@@ -96,6 +119,16 @@ async def websocket_endpoint(websocket: WebSocket):
         pass
     finally:
         connected_clients.discard(websocket)
+
+
+@app.get('/market_status')
+async def market_status():
+    return {
+        'mode': getattr(app.state, 'market_mode', 'disabled'),
+        'supported_symbols': list(SUPPORTED_SYMBOLS),
+        'ready_symbols': [symbol for symbol in SUPPORTED_SYMBOLS if quote_book.get(symbol, require_fresh=True)],
+        'quote_max_age_seconds': quote_book.max_age,
+    }
 
 
 @app.post('/register')

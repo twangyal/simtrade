@@ -56,6 +56,9 @@ function Info({ instrumentSelect }) {
     <div className="bg-white p-6 rounded-lg shadow-lg">
       <h2 className="text-lg font-semibold mb-2">Instrument: {instrumentSelect}</h2>
       <p role="status" className="text-sm text-gray-600 mb-3">{status}</p>
+      {data?.symbol === instrumentSelect && data.source === 'demo' && <p role="note" className="mb-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+        Demo quote: this price is synthetic, not live market data.
+      </p>}
       <Price data={data} parentChange={instrumentSelect} />
       {history.length > 0 && <div className="mt-6">
         <p className="text-sm text-gray-600">Quotes received during this session.</p>
