@@ -132,7 +132,7 @@ async def market_status():
 
 
 @app.post('/register')
-async def register(user: UserCreate, db: Database = Depends(get_db)):
+async def register(user: UserCreate, db: Database = Depends(get_db, scope='function')):
     if await crud.get_user(db, user.username):
         raise HTTPException(status_code=400, detail='Username already registered')
     hashed_password = await asyncio.to_thread(get_password_hash, user.password)
@@ -152,7 +152,7 @@ async def register(user: UserCreate, db: Database = Depends(get_db)):
 
 
 @app.post('/login', response_model=Token)
-async def login(user: UserLogin, db: Database = Depends(get_db)):
+async def login(user: UserLogin, db: Database = Depends(get_db, scope='function')):
     db_user = await crud.get_user(db, user.username)
     if not db_user or not await asyncio.to_thread(verify_password, user.password, db_user.hashed_password):
         raise HTTPException(status_code=401, detail='Invalid credentials', headers={'WWW-Authenticate': 'Bearer'})
@@ -188,7 +188,7 @@ async def marked_portfolio(db, user_id):
 
 
 @app.get('/user_data', response_model=UserInfo)
-async def read_user_data(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
+async def read_user_data(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db, scope='function')):
     record = await require_user(db, user.username, for_update=True)
     holdings = await marked_portfolio(db, record.id)
     values = [Decimal(str(item['quantity'])) * Decimal(str(item['current_price'])) for item in holdings]
@@ -201,7 +201,7 @@ async def read_user_data(user: TokenData = Depends(decode_access_token), db: Dat
 
 
 @app.get('/portfolio')
-async def read_portfolio(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
+async def read_portfolio(user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db, scope='function')):
     record = await require_user(db, user.username, for_update=True)
     return await marked_portfolio(db, record.id)
 
@@ -209,7 +209,7 @@ async def read_portfolio(user: TokenData = Depends(decode_access_token), db: Dat
 @app.get('/trades', response_model=TradePagination)
 async def read_trades(
     limit: int = Query(10, ge=1, le=100), page: int = Query(1, ge=1),
-    user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db),
+    user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db, scope='function'),
 ):
     record = await require_user(db, user.username)
     count = await crud.get_trade_count(db, record.id)
@@ -259,10 +259,10 @@ async def execute_order(trade, user, db, side):
 
 
 @app.post('/BUY')
-async def buy_shares(trade: TradeCreate, user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
+async def buy_shares(trade: TradeCreate, user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db, scope='function')):
     return await execute_order(trade, user, db, 'BUY')
 
 
 @app.post('/SELL')
-async def sell_shares(trade: TradeCreate, user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db)):
+async def sell_shares(trade: TradeCreate, user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db, scope='function')):
     return await execute_order(trade, user, db, 'SELL')
