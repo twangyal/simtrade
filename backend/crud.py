@@ -1,5 +1,5 @@
 from databases import Database
-from models import User, Trade, Portfolio
+from models import User, Trade, Portfolio, OrderReceipt
 from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy import func, select
@@ -68,6 +68,26 @@ async def get_trades(db: Database, user_id: int, *, limit: int | None = None, of
 async def get_trade_count(db: Database, user_id: int):
     query = select(func.count()).select_from(Trade.__table__).where(Trade.user_id == user_id)
     return await db.fetch_val(query)
+
+
+async def get_order_receipt(db: Database, user_id: int, client_order_id: str):
+    query = OrderReceipt.__table__.select().where(
+        OrderReceipt.user_id == user_id,
+        OrderReceipt.client_order_id == client_order_id,
+    )
+    return await db.fetch_one(query)
+
+
+async def create_order_receipt(
+    db: Database, user_id: int, client_order_id: str,
+    side: str, symbol: str, quantity: str, response: dict,
+):
+    """Persist only within the same transaction and user lock as the fill."""
+    return await db.execute(OrderReceipt.__table__.insert().values(
+        user_id=user_id, client_order_id=client_order_id,
+        side=side, symbol=symbol, quantity=quantity, response=response,
+    ))
+
 
 async def update_balance(db: Database, user_id: int, new_balance: float):
     new_balance = round(new_balance, 2)

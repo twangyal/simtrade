@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, JSON, UniqueConstraint
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime, timezone
@@ -45,4 +45,19 @@ class Portfolio(Base):
     user = relationship("User", back_populates="portfolio")
 
 
+class OrderReceipt(Base):
+    """A completed order's replay record, committed in the fill transaction."""
+
+    __tablename__ = "order_receipts"
+    __table_args__ = (
+        UniqueConstraint("user_id", "client_order_id", name="uq_order_receipt_user_client_id"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    client_order_id = Column(String(36), nullable=False)
+    side = Column(String(4), nullable=False)
+    symbol = Column(String(20), nullable=False)
+    quantity = Column(String(32), nullable=False)
+    response = Column(JSON, nullable=False)
 

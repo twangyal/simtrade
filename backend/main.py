@@ -234,13 +234,22 @@ async def read_trades(
 async def execute_order(trade, user, db, side):
     # PostgreSQL holds this account lock until get_db commits every order write.
     record = await require_user(db, user.username, for_update=True)
+    side = side.upper()
+    quantity = Decimal(str(trade.quantity))
+    client_order_id = str(trade.client_order_id) if trade.client_order_id is not None else None
+    normalized_quantity = format(quantity.normalize(), 'f')
+    if client_order_id is not None:
+        receipt = await crud.get_order_receipt(db, record.id, client_order_id)
+        if receipt is not None:
+            if (receipt.side, receipt.symbol, receipt.quantity) != (side, trade.symbol, normalized_quantity):
+                raise HTTPException(status_code=409, detail='This client order ID was already used for a different order')
+            return receipt.response
     try:
         price = quote_book.execution_price(trade.symbol, side)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail='Unsupported symbol') from exc
     except LookupError as exc:
         raise HTTPException(status_code=503, detail='A fresh market quote is unavailable. Try again later.') from exc
-    quantity = Decimal(str(trade.quantity))
     with localcontext() as context:
         context.prec = 40
         notional = quantity * Decimal(str(price))
@@ -272,7 +281,12 @@ async def execute_order(trade, user, db, side):
     await crud.create_trade(db, record.id, trade.symbol,
                             trade.quantity if side == 'BUY' else -trade.quantity,
                             price, 'LONG' if side == 'BUY' else 'SHORT')
-    return {'msg': 'Trade created successfully'}
+    response = {'msg': 'Trade created successfully'}
+    if client_order_id is not None:
+        await crud.create_order_receipt(
+            db, record.id, client_order_id, side, trade.symbol, normalized_quantity, response,
+        )
+    return response
 
 
 @app.post('/BUY')

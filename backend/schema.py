@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from decimal import Decimal
+from uuid import UUID
 from limits import MAX_QUANTITY, QUANTITY_DECIMAL_PLACES
 from pydantic import BaseModel, Field, field_validator
 
@@ -39,6 +40,7 @@ class UserInfo(BaseModel):
 class TradeCreate(BaseModel):
     symbol: str = Field(min_length=1, max_length=20)
     quantity: float = Field(gt=0, le=MAX_QUANTITY, allow_inf_nan=False)
+    client_order_id: UUID | None = None
 
     @field_validator('quantity')
     @classmethod
