@@ -108,9 +108,11 @@ async function captureLayout(page, testInfo, name, { fullPage = true } = {}) {
   await expectNoHorizontalOverflow(page);
 }
 
-async function registerAndLogin(page, testInfo, screenshotPrefix) {
+async function registerAndLogin(page, testInfo, screenshotPrefix, { shortUsername = false } = {}) {
   // A long, unbroken account name exercises header wrapping at narrow widths.
-  const username = `investor_with_a_deliberately_long_name_${randomUUID().replaceAll('-', '')}`;
+  const username = shortUsername
+    ? `ChartExplorer_${randomUUID().slice(0, 8)}`
+    : `investor_with_a_deliberately_long_name_${randomUUID().replaceAll('-', '')}`;
   const password = `PaperTrade-${randomUUID()}`;
   await page.goto(`${FRONTEND_ORIGIN}/register`);
   await expect(page.getByRole('heading', { name: 'Register', exact: true })).toBeVisible();
@@ -138,6 +140,27 @@ async function expectReceivedQuoteChart(page, symbol) {
   return chart;
 }
 
+async function expectLastPriceEstimates(page, quantity) {
+  await expect(page.getByLabel('Indicative buy value', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Indicative sell value', { exact: true })).toBeVisible();
+  await expect(page.getByText('USD estimates only. Final price and cent rounding may vary. A recent receipt does not guarantee an executable quote.', { exact: true })).toBeVisible();
+  // Read all displayed amounts in one browser turn, between demo quote updates.
+  const values = await page.evaluate(() => {
+    const amount = (label) => Number(document.querySelector(`[aria-label="${label}"]`).textContent.replace(/[^0-9.-]/g, ''));
+    return {
+      price: amount('Last received price'),
+      buy: amount('Indicative buy value'),
+      sell: amount('Indicative sell value'),
+    };
+  });
+  const notional = quantity * values.price;
+  expect(notional).toBeGreaterThan(0);
+  expect(values.buy).toBeGreaterThanOrEqual(notional - 0.000001);
+  expect(values.buy).toBeLessThan(notional + 0.010001);
+  expect(values.sell).toBeLessThanOrEqual(notional + 0.000001);
+  expect(values.sell).toBeGreaterThan(notional - 0.010001);
+}
+
 async function accountSnapshot(page) {
   return page.evaluate(async (apiOrigin) => {
     const token = localStorage.getItem('accessToken');
@@ -155,6 +178,118 @@ async function accountSnapshot(page) {
       history: await read('/trades?page=1&limit=100'),
     };
   }, API_ORIGIN);
+}
+
+async function expectTableColumnsReachable(page, label, finalHeading) {
+  // Exercise the controls themselves: locator visibility does not detect clipping.
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const region = page.getByRole('region', { name: label, exact: true });
+  const left = page.getByRole('button', { name: `Scroll ${label} left`, exact: true });
+  const right = page.getByRole('button', { name: `Scroll ${label} right`, exact: true });
+  await expect(region.getByRole('columnheader', { name: finalHeading, exact: true })).toBeVisible();
+  await expect(left).toBeDisabled();
+  await expect(right).toBeEnabled();
+  await expect(right).toHaveAttribute('aria-controls', await region.getAttribute('id'));
+  const start = await region.evaluate((element) => element.scrollLeft);
+  await right.focus();
+  await page.keyboard.press('Enter');
+  await expect.poll(() => region.evaluate((element) => element.scrollLeft)).toBeGreaterThan(start);
+  for (let step = 0; step < 8; step += 1) {
+    const atEnd = await region.evaluate((element) =>
+      element.scrollLeft >= element.scrollWidth - element.clientWidth - 1);
+    if (atEnd) break;
+    await right.click();
+  }
+  await expect(right).toBeDisabled();
+  await expect(left).toBeEnabled();
+  const geometry = await region.evaluate((element) => {
+    const viewport = element.getBoundingClientRect();
+    const leftEdge = viewport.left + element.clientLeft;
+    const rightEdge = leftEdge + element.clientWidth;
+    return [...element.querySelectorAll('thead th:last-child, tbody td:last-child')].map((cell) => {
+      const bounds = cell.getBoundingClientRect();
+      return { left: bounds.left, right: bounds.right, leftEdge, rightEdge };
+    });
+  });
+  expect(geometry.length, 'Check both the final heading and its data cells').toBeGreaterThan(1);
+  for (const cell of geometry) {
+    expect(cell.left, `${finalHeading} must fit inside the scroll viewport`).toBeGreaterThanOrEqual(cell.leftEdge - 1);
+    expect(cell.right, `${finalHeading} must fit inside the scroll viewport`).toBeLessThanOrEqual(cell.rightEdge + 1);
+  }
+}
+
+async function fillLocalDemoOrders(page, orders) {
+  // The token remains in the authenticated browser; only synthetic orders leave it.
+  return page.evaluate(async ({ apiOrigin, fills }) => {
+    const token = localStorage.getItem('accessToken');
+    if (!token) throw new Error('The browser must be logged in before placing demo orders');
+    const results = [];
+    for (const { side, ...order } of fills) {
+      const response = await fetch(`${apiOrigin}/${side}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(order),
+      });
+      results.push({ symbol: order.symbol, status: response.status });
+    }
+    return results;
+  }, {
+    apiOrigin: API_ORIGIN,
+    fills: orders.map((order) => ({ ...order, client_order_id: randomUUID() })),
+  });
+}
+
+async function expectMixedExposure(page, holdings) {
+  const money = (value) => new Intl.NumberFormat('en-US', {
+    style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2,
+  }).format(value);
+  const marked = holdings.map(({ symbol, quantity, current_price }) => ({
+    symbol, quantity, value: Math.abs(quantity) * current_price,
+  }));
+  expect(marked).toHaveLength(3);
+  expect(marked.filter(({ quantity }) => quantity > 0)).toHaveLength(2);
+  expect(marked.filter(({ quantity }) => quantity < 0)).toHaveLength(1);
+  const gross = marked.reduce((total, { value }) => total + value, 0);
+  const long = marked.filter(({ quantity }) => quantity > 0).reduce((total, { value }) => total + value, 0);
+  const short = marked.filter(({ quantity }) => quantity < 0).reduce((total, { value }) => total + value, 0);
+  expect(short).toBeGreaterThan(0);
+  expect(gross).toBeGreaterThan(long);
+  const exposure = page.getByRole('region', { name: 'Position exposure', exact: true });
+  const chart = exposure.getByRole('img', { name: 'Position exposure chart', exact: true });
+  await expect(chart).toBeVisible();
+  await expect(chart.locator('desc')).toContainText(`Gross exposure ${money(gross)}`);
+  await expect(chart.locator('desc')).toContainText(`Long positions ${money(long)}`);
+  await expect(chart.locator('desc')).toContainText(`short positions ${money(short)}`);
+  await expect(chart.locator('desc')).toContainText('Short positions are liabilities.');
+  const rows = exposure.getByRole('list', { name: 'Marked position breakdown', exact: true }).getByRole('listitem');
+  await expect(rows).toHaveCount(3);
+  for (const position of marked) {
+    expect(position.value).toBeGreaterThan(0);
+    const name = `${position.symbol} · ${position.quantity < 0 ? 'Short' : 'Long'}`;
+    const row = rows.filter({ has: page.getByText(name, { exact: true }) });
+    await expect(row.getByText(name, { exact: true })).toBeVisible();
+    await expect(row.getByText(money(position.value), { exact: true })).toBeVisible();
+    await expect(row.getByText(`${Number((position.value / gross * 100).toFixed(1))}%`, { exact: true })).toBeVisible();
+  }
+  const segments = chart.locator('[data-exposure-segment]');
+  await expect(segments).toHaveCount(3);
+  const weights = await segments.evaluateAll((elements) => elements.map((element) =>
+    Number(element.getAttribute('stroke-dasharray').split(' ')[0])));
+  expect(weights.reduce((total, value) => total + value, 0)).toBeCloseTo(100, 8);
+  expect(weights.every((value) => value > 0 && value < 100)).toBe(true);
+  const expectedWeights = marked.map(({ value }) => value / gross * 100).sort((left, right) => right - left);
+  weights.forEach((weight, index) => expect(weight).toBeCloseTo(expectedWeights[index], 8));
+  const layout = await exposure.evaluate((panel) => {
+    const bounds = panel.getBoundingClientRect();
+    return [...panel.querySelectorAll('svg, ul, li, li > span')].map((element) => {
+      const rect = element.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, panelLeft: bounds.left, panelRight: bounds.right };
+    });
+  });
+  for (const element of layout) {
+    expect(element.left, 'The chart and every legend field must remain within their panel').toBeGreaterThanOrEqual(element.panelLeft - 1);
+    expect(element.right, 'The chart and every legend field must remain within their panel').toBeLessThanOrEqual(element.panelRight + 1);
+  }
 }
 
 test('desktop registration, real quote chart, fractional replay, and protected routes', async ({ page }, testInfo) => {
@@ -189,8 +324,11 @@ test('desktop registration, real quote chart, fractional replay, and protected r
   await page.keyboard.press('ArrowRight');
   await expect(quoteInspector).toHaveValue('1');
   await expect(page.getByText('Inspecting quote', { exact: true })).toBeVisible();
-  await captureLayout(page, testInfo, 'desktop-trade');
+  await page.getByLabel(`Quantity of ${symbol}`, { exact: true }).fill(String(quantity * 2));
+  await expectLastPriceEstimates(page, quantity * 2);
   await page.getByLabel(`Quantity of ${symbol}`, { exact: true }).fill(String(quantity));
+  await expectLastPriceEstimates(page, quantity);
+  await captureLayout(page, testInfo, 'desktop-trade');
 
   const fillResponsePromise = page.waitForResponse((response) =>
     response.url() === `${API_ORIGIN}/BUY` && response.request().method() === 'POST');
@@ -320,7 +458,11 @@ test('mobile layouts keep trading usable and trap and restore navigation focus',
   await expect(page).toHaveURL(`${FRONTEND_ORIGIN}/trade`);
   await expectReceivedQuoteChart(page, 'BTC/USD');
   await captureLayout(page, testInfo, 'mobile-trade');
+  await page.getByRole('link', { name: 'Jump to order ticket', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Order ticket', exact: true })).toBeInViewport({ ratio: 1 });
   await page.getByLabel('Quantity of BTC/USD', { exact: true }).fill('0.125');
+  await expectLastPriceEstimates(page, 0.125);
+  await captureLayout(page, testInfo, 'mobile-order-ticket', { fullPage: false });
   await page.getByRole('button', { name: 'Buy', exact: true }).click();
   await expect(page.getByText('Buy order for 0.125 BTC/USD completed.', { exact: true })).toBeVisible();
 
@@ -328,14 +470,75 @@ test('mobile layouts keep trading usable and trap and restore navigation focus',
   await expect(page.getByRole('img', { name: 'Position exposure chart', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Trade BTC/USD', exact: true })).toBeVisible();
   await captureLayout(page, testInfo, 'mobile-overview-populated');
+  await expectTableColumnsReachable(page, 'Portfolio holdings', 'Unrealized P&L');
+  await captureLayout(page, testInfo, 'mobile-overview-values');
 
   await navigateWorkspace(page, 'Activity');
   await expect(page.getByRole('heading', { name: 'Trade History', exact: true })).toBeVisible();
   await expect(page.getByText('Page 1 of 1', { exact: true })).toBeVisible();
   await expect(page.getByRole('cell', { name: 'BTC/USD', exact: true })).toBeVisible();
   await captureLayout(page, testInfo, 'mobile-activity');
+  await expectTableColumnsReachable(page, 'Trade records', 'Notional');
+  await captureLayout(page, testInfo, 'mobile-activity-notional');
 
   await navigateWorkspace(page, 'Log Out');
   await expect(page).toHaveURL(`${FRONTEND_ORIGIN}/login`);
   expect(await page.evaluate(() => localStorage.getItem('accessToken'))).toBeNull();
+});
+
+test('mixed long and short exposure fits desktop, tablet, and narrow mobile layouts', async ({ page }, testInfo) => {
+  test.setTimeout(90_000);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await registerAndLogin(page, testInfo, 'mixed', { shortUsername: true });
+  await navigateWorkspace(page, 'Trade');
+  await expectReceivedQuoteChart(page, 'BTC/USD');
+  const fills = await fillLocalDemoOrders(page, [
+    { symbol: 'AAPL', side: 'BUY', quantity: 40 },
+    { symbol: 'BTC/USD', side: 'BUY', quantity: 0.125 },
+    { symbol: 'QQQ', side: 'SELL', quantity: 15 },
+  ]);
+  expect(fills).toEqual([
+    { symbol: 'AAPL', status: 200 },
+    { symbol: 'BTC/USD', status: 200 },
+    { symbol: 'QQQ', status: 200 },
+  ]);
+  // Use the exact marks that Dashboard renders, not a later independent request.
+  const portfolioResponse = page.waitForResponse((response) =>
+    response.url() === `${API_ORIGIN}/portfolio` && response.request().method() === 'GET');
+  await navigateWorkspace(page, 'Overview');
+  const holdings = await (await portfolioResponse).json();
+  expect(holdings).toEqual(expect.arrayContaining([
+    expect.objectContaining({ symbol: 'AAPL', quantity: 40 }),
+    expect.objectContaining({ symbol: 'BTC/USD', quantity: 0.125 }),
+    expect.objectContaining({ symbol: 'QQQ', quantity: -15 }),
+  ]));
+  const snapshot = await accountSnapshot(page);
+  expect(snapshot.history.trades).toHaveLength(3);
+  expect(snapshot.account.short_liability).toBeLessThan(0);
+
+  for (const viewport of [
+    { name: 'desktop', width: 1440, height: 1000 },
+    { name: 'tablet-landscape', width: 1024, height: 768 },
+    { name: 'tablet-portrait', width: 768, height: 1024 },
+    { name: 'narrow-mobile', width: 320, height: 812 },
+  ]) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await expectMixedExposure(page, holdings);
+    await expect(page.getByRole('region', { name: 'Portfolio holdings', exact: true }).locator('tbody tr')).toHaveCount(3);
+    const opener = page.getByRole('button', { name: 'Open navigation', exact: true });
+    if (viewport.width >= 1100) {
+      await expect(opener).not.toBeVisible();
+      await expect(page.getByRole('navigation', { name: 'Main navigation', exact: true })).toBeVisible();
+    } else {
+      await expect(opener).toBeVisible();
+    }
+    await captureLayout(page, testInfo, `${viewport.name}-mixed-overview`);
+  }
+
+  await expectTableColumnsReachable(page, 'Portfolio holdings', 'Unrealized P&L');
+  await captureLayout(page, testInfo, 'narrow-mobile-mixed-values');
+  await navigateWorkspace(page, 'Activity');
+  await expect(page.getByRole('region', { name: 'Trade records', exact: true }).locator('tbody tr')).toHaveCount(3);
+  await expectTableColumnsReachable(page, 'Trade records', 'Notional');
+  await captureLayout(page, testInfo, 'narrow-mobile-mixed-activity');
 });

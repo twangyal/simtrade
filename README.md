@@ -109,11 +109,13 @@ The dashboard calculates unrealized profit/loss as signed quantity times the dif
 
 ## Interface and charts
 
-The workspace has persistent desktop navigation and a keyboard-accessible mobile drawer. Overview shows account snapshots, open holdings and their marked exposure; refresh actions reload failed or outdated account and activity snapshots. Selecting a holding opens its instrument directly in Trade. Activity displays execution history in local time. The public and authentication pages share the same visual system.
+The workspace has persistent desktop navigation and a keyboard-accessible mobile drawer. Overview shows account snapshots, open holdings and their marked exposure; refresh actions reload failed or outdated account and activity snapshots. Selecting a holding opens its instrument directly in Trade. Activity displays execution history in local time. Wide tables show column navigation controls when they overflow, and mobile trading provides a jump link to the order ticket. The public and authentication pages share the same visual system.
 
 The trading chart draws only quotes received while the instrument is open in the current browser. It retains up to 1,800 observations, preserves them across reconnects, and clears them when leaving the screen or changing instruments. The 1m and 5m controls select windows ending at the latest received quote; All shows the retained observations. Times are browser receipt times. Observed change compares the first and last visible observations, not daily returns. Empty and single-quote states do not invent a trend. Inspect exact observations by pointing at the chart or using the tick slider with the keyboard arrow keys. Prices use the instrument's quote units rather than assuming every instrument is quoted in USD.
 
 The position exposure chart uses absolute marked position values, so shorts contribute a positive share of gross exposure while remaining liabilities. It excludes cash and positions without a usable market mark, labels partial data, and provides the figures in a visible breakdown as well as the chart. It is a current portfolio snapshot, not historical performance. Demo quotes stay explicitly labelled as invented practice data.
+
+The order ticket previews indicative USD buy and sell values using the same received quote stream. A complete valid bid/ask pair takes precedence over the last price; buy debits round up and sell credits round down to cents, using exact decimal multiplication. The preview clears when switching instruments and becomes unavailable after 60 seconds without a new receipt. It does not verify buying power, position limits or backend quote freshness, and is not a guaranteed execution price. Order validation and settlement remain on the server.
 
 ## Order retries
 
