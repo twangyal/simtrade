@@ -2,7 +2,7 @@
 import asyncio
 from contextlib import asynccontextmanager, suppress
 from datetime import timedelta
-from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR, localcontext
+from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR, ROUND_HALF_EVEN, localcontext
 import math
 import os
 
@@ -26,6 +26,9 @@ import crud
 
 quote_book = QuoteBook()
 connected_clients: set[WebSocket] = set()
+# Canonical float marks and 8-place quantities have product exponents >= -348.
+# Eight bounded positions plus cash stay below 1e13: at most 361 exact digits.
+VALUATION_DECIMAL_PRECISION = 400
 
 
 async def close_client(client, *, code):
@@ -221,11 +224,15 @@ async def read_user_data(user: TokenData = Depends(decode_access_token), db: Dat
     record = await require_user(db, user.username, for_update=True)
     holdings = await marked_portfolio(db, record.id)
     estimated = any(item['current_price'] is None for item in holdings)
-    values = [Decimal(str(item['quantity'])) * Decimal(str(
-        item['current_price'] if item['current_price'] is not None else item['avg_price']
-    )) for item in holdings]
-    liability = float(sum((value for value in values if value < 0), Decimal(0)).quantize(Decimal('0.01')))
-    networth = float((Decimal(str(record.balance)) + sum(values, Decimal(0))).quantize(Decimal('0.01')))
+    with localcontext() as context:
+        context.prec = VALUATION_DECIMAL_PRECISION
+        values = [Decimal(str(item['quantity'])) * Decimal(str(
+            item['current_price'] if item['current_price'] is not None else item['avg_price']
+        )) for item in holdings]
+        liability = float(sum((value for value in values if value < 0), Decimal(0)).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_EVEN))
+        networth = float((Decimal(str(record.balance)) + sum(values, Decimal(0))).quantize(
+            Decimal('0.01'), rounding=ROUND_HALF_EVEN))
     liability = await crud.update_short_liability(db, record.id, liability)
     networth = await crud.update_networth(db, record.id, networth)
     return UserInfo(id=record.id, username=record.username, balance=record.balance,
