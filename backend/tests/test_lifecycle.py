@@ -19,14 +19,19 @@ from market import QuoteBook
 
 
 class FakeClient:
-    def __init__(self, *, fail_send=False, fail_close=False):
+    def __init__(self, *, fail_send=False, fail_close=False, slow_send=False, slow_close=False):
         self.fail_send = fail_send
         self.fail_close = fail_close
+        self.slow_send = slow_send
+        self.slow_close = slow_close
         self.accepted = False
         self.messages = []
         self.close_codes = []
         self.waiting = asyncio.Event()
         self.disconnect = asyncio.Event()
+        self.message_received = asyncio.Event()
+        self.send_cancelled = asyncio.Event()
+        self.close_cancelled = asyncio.Event()
 
     async def accept(self):
         self.accepted = True
@@ -34,7 +39,13 @@ class FakeClient:
     async def send_json(self, data):
         if self.fail_send:
             raise RuntimeError("connection closed")
+        if self.slow_send:
+            try:
+                await asyncio.Future()
+            finally:
+                self.send_cancelled.set()
         self.messages.append(data)
+        self.message_received.set()
 
     async def receive_text(self):
         self.waiting.set()
@@ -45,6 +56,12 @@ class FakeClient:
         self.close_codes.append(code)
         if self.fail_close:
             raise RuntimeError("connection already closed")
+        if self.slow_close:
+            try:
+                await asyncio.Future()
+            finally:
+                self.close_cancelled.set()
+        self.disconnect.set()
 
 
 class FakeDatabase:
@@ -137,6 +154,22 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(client.close_codes, [1001])
         self.assertEqual(self.clients, set())
 
+    async def test_shutdown_bounds_all_client_closes_and_disconnects_database(self):
+        stalled = [FakeClient(slow_close=True), FakeClient(slow_close=True)]
+        healthy = FakeClient()
+        self.clients.update([*stalled, healthy])
+        # Two independent stalled sockets must share one two-second timeout
+        # window; serial close timeouts would exceed the outer deadline.
+        async with asyncio.timeout(3.5):
+            async with main.lifespan(main.app):
+                pass
+        self.assertEqual(self.events[-1], "database disconnected")
+        self.assertEqual(healthy.close_codes, [1001])
+        for client in stalled:
+            self.assertEqual(client.close_codes, [1001])
+            self.assertTrue(client.close_cancelled.is_set())
+        self.assertEqual(self.clients, set())
+
     async def test_new_websocket_gets_only_fresh_known_quotes(self):
         now = [0]
         main.quote_book = QuoteBook(clock=lambda: now[0])
@@ -162,9 +195,52 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         await main.broadcast_to_clients(quote)
         self.assertEqual(healthy.messages, [quote])
         self.assertEqual(self.clients, {healthy})
-        failed.disconnect.set()
-        await task
+        self.assertEqual(failed.close_codes, [1011])
+        # Closing the dropped socket releases receive_text without another
+        # browser message, allowing the browser's reconnect path to run.
+        await asyncio.wait_for(task, timeout=1)
         self.assertEqual(self.clients, {healthy})
+
+    async def test_slow_send_closes_dropped_socket_and_keeps_healthy_updates(self):
+        stalled = FakeClient(slow_send=True)
+        healthy = FakeClient()
+        self.clients.update([stalled, healthy])
+        quote = {"symbol": "AAPL", "price": 120.0}
+        task = asyncio.create_task(main.broadcast_to_clients(quote))
+        await asyncio.wait_for(healthy.message_received.wait(), timeout=1)
+        self.assertFalse(task.done())
+        self.assertEqual(healthy.messages, [quote])
+        await asyncio.wait_for(task, timeout=3.5)
+        self.assertTrue(stalled.send_cancelled.is_set())
+        self.assertEqual(stalled.close_codes, [1011])
+        self.assertEqual(self.clients, {healthy})
+        next_quote = {"symbol": "AAPL", "price": 121.0}
+        await main.broadcast_to_clients(next_quote)
+        self.assertEqual(healthy.messages, [quote, next_quote])
+
+    async def test_unresponsive_close_is_bounded_without_blocking_healthy_delivery(self):
+        stalled = FakeClient(fail_send=True, slow_close=True)
+        healthy = FakeClient()
+        self.clients.update([stalled, healthy])
+        quote = {"symbol": "AAPL", "price": 120.0}
+        task = asyncio.create_task(main.broadcast_to_clients(quote))
+        await asyncio.wait_for(healthy.message_received.wait(), timeout=1)
+        self.assertEqual(healthy.messages, [quote])
+        await asyncio.wait_for(task, timeout=3.5)
+        self.assertEqual(stalled.close_codes, [1011])
+        self.assertTrue(stalled.close_cancelled.is_set())
+        self.assertEqual(self.clients, {healthy})
+
+    async def test_close_error_and_repeated_broadcast_cleanup_are_tolerated(self):
+        closed = FakeClient(fail_send=True, fail_close=True)
+        healthy = FakeClient()
+        self.clients.update([closed, healthy])
+        quotes = [{"symbol": "AAPL", "price": 120.0}, {"symbol": "AAPL", "price": 121.0}]
+        for quote in quotes:
+            await main.broadcast_to_clients(quote)
+        self.assertEqual(closed.close_codes, [1011])
+        self.assertEqual(self.clients, {healthy})
+        self.assertEqual(healthy.messages, quotes)
 
 
 if __name__ == "__main__":

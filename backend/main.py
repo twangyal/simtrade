@@ -26,13 +26,20 @@ quote_book = QuoteBook()
 connected_clients: set[WebSocket] = set()
 
 
+async def close_client(client, *, code):
+    """Remove a browser and bound the close handshake even if it stops reading."""
+    connected_clients.discard(client)
+    with suppress(Exception):
+        await asyncio.wait_for(client.close(code=code), timeout=2)
+
+
 async def broadcast_to_clients(data):
     """A disconnected or slow browser must not interrupt the market feed."""
     async def send(client):
         try:
             await asyncio.wait_for(client.send_json(data), timeout=2)
         except Exception:
-            connected_clients.discard(client)
+            await close_client(client, code=1011)
     await asyncio.gather(*(send(client) for client in tuple(connected_clients)))
 
 
@@ -77,9 +84,9 @@ async def lifespan(app: FastAPI):
                 with suppress(asyncio.CancelledError):
                     await feed_task
         finally:
-            for client in tuple(connected_clients):
-                with suppress(Exception):
-                    await client.close(code=1001)
+            await asyncio.gather(*(
+                close_client(client, code=1001) for client in tuple(connected_clients)
+            ))
             connected_clients.clear()
             await database.disconnect()
             app.state.market_mode = 'disabled'
