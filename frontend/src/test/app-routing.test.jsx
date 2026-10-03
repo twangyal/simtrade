@@ -10,7 +10,6 @@ vi.mock('axios', () => {
   client.create = () => client;
   return { default: client };
 });
-vi.mock('highcharts-react-official', () => ({ default: () => <div /> }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -41,7 +40,7 @@ it('opens the protected trading page after login and supports returning to the d
   expect(await screen.findByRole('spinbutton')).toBeTruthy();
   expect(screen.getByLabelText('Instrument')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Home' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Overview' }));
   expect(await screen.findByText('Welcome, Trader')).toBeTruthy();
   expect(screen.queryByRole('spinbutton')).toBeNull();
 });

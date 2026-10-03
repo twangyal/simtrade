@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import Highcharts from 'highcharts';
-import HighchartsReact from 'highcharts-react-official';
 import Price from './price.jsx';
 import { WS_URL } from '../api';
+import { appendQuote, normalizeQuote } from '../quotes';
+import MarketQuoteChart from './MarketQuoteChart';
 
 function Info({ instrumentSelect }) {
   const [data, setData] = useState(null);
@@ -43,14 +43,13 @@ function Info({ instrumentSelect }) {
       ws.onmessage = (event) => {
         if (!isCurrent()) return;
         try {
-          const quote = JSON.parse(event.data);
-          if (quote.symbol !== instrumentSelect) return;
-          const price = Number(Array.isArray(quote.price) ? quote.price[0] : quote.price);
-          if (!Number.isFinite(price) || price <= 0) return;
+          const quote = normalizeQuote(JSON.parse(event.data), instrumentSelect);
+          if (!quote) return;
+          const receivedAt = Date.now();
           retryDelay = 1000;
           setData(quote);
           setStatus('Last received quote');
-          setHistory((points) => [...points.slice(-99), [Date.now(), price]]);
+          setHistory((points) => appendQuote(points, quote, receivedAt));
         } catch {
           setStatus('Unable to read market data. Waiting for the next quote…');
         }
@@ -73,26 +72,18 @@ function Info({ instrumentSelect }) {
     };
   }, [instrumentSelect]);
 
-  const graphOptions = {
-    title: { text: `Price Trend for ${instrumentSelect}` },
-    xAxis: { type: 'datetime' },
-    yAxis: { title: { text: 'Price' } },
-    series: [{ name: instrumentSelect, data: history, color: '#4A90E2' }],
-  };
-
   return (
-    <div className="bg-white p-6 rounded-lg shadow-lg">
-      <h2 className="text-lg font-semibold mb-2">Instrument: {instrumentSelect}</h2>
-      <p role="status" className="text-sm text-gray-600 mb-3">{status}</p>
-      {data?.symbol === instrumentSelect && data.source === 'demo' && <p role="note" className="mb-3 rounded-md bg-amber-50 p-3 text-sm text-amber-900">
+    <section className="quote-panel" aria-label={`${instrumentSelect} market quotes`}>
+      <div className="quote-panel-heading">
+        <h2>Instrument: {instrumentSelect}</h2>
+        <p role="status" className={`quote-connection ${status === 'Last received quote' ? 'is-received' : ''}`}>{status}</p>
+      </div>
+      <Price data={data} parentChange={instrumentSelect} />
+      <MarketQuoteChart key={instrumentSelect} points={data?.symbol === instrumentSelect ? history : []} symbol={instrumentSelect} />
+      {data?.symbol === instrumentSelect && data.source === 'demo' && <p role="note" className="quote-demo-note">
         Demo quote: this price is synthetic, not live market data.
       </p>}
-      <Price data={data} parentChange={instrumentSelect} />
-      {history.length > 0 && <div className="mt-6">
-        <p className="text-sm text-gray-600">Quotes received during this session.</p>
-        <HighchartsReact highcharts={Highcharts} options={graphOptions} />
-      </div>}
-    </div>
+    </section>
   );
 }
 

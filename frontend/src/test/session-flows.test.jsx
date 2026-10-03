@@ -10,7 +10,6 @@ vi.mock('axios', () => {
   client.create = () => client;
   return { default: client };
 });
-vi.mock('highcharts-react-official', () => ({ default: () => <div /> }));
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -147,12 +146,12 @@ it('registers, logs in, places a fractional order, reads history and logs out ac
   fillLogin('FlowTrader');
   await screen.findByText('Welcome, FlowTrader');
   fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
-  fireEvent.click(screen.getByRole('button', { name: 'Trade', exact: true }));
+  fireEvent.click(screen.getByRole('link', { name: 'Trade', exact: true }));
   fireEvent.change(await screen.findByRole('spinbutton'), { target: { value: '0.25' } });
   fireEvent.click(screen.getByRole('button', { name: 'Buy' }));
   await screen.findByText('Buy order for 0.25 BTC/USD completed.');
   fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
-  fireEvent.click(screen.getByRole('button', { name: 'View Trade History' }));
+  fireEvent.click(screen.getByRole('link', { name: 'Activity' }));
   await screen.findByText('BTC/USD');
   expect(screen.getByText('0.25')).toBeTruthy();
   expect(screen.getByText('$25.00')).toBeTruthy();

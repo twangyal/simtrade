@@ -13,7 +13,6 @@ vi.mock('axios', () => {
   client.create = () => client;
   return { default: client };
 });
-vi.mock('highcharts-react-official', () => ({ default: () => <div /> }));
 
 function renderPage(page) {
   return render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>{page}</MemoryRouter>);
@@ -94,8 +93,9 @@ describe('account views', () => {
 
 it('shows zero bid/ask quotes without treating them as missing', () => {
   render(<Price data={{ symbol: 'AAPL', price: 0, bid: 0, ask: 0 }} parentChange="AAPL" />);
-  expect(screen.getByText('Ask: 0')).toBeTruthy();
-  expect(screen.getByText('Bid: 0')).toBeTruthy();
+  expect(screen.getByLabelText('Last received price').textContent).toBe('0.00');
+  expect(screen.getByText('Ask').nextElementSibling.textContent).toBe('0.00');
+  expect(screen.getByText('Bid').nextElementSibling.textContent).toBe('0.00');
 });
 
 it('ignores an older history response after an effect is cleaned up', async () => {

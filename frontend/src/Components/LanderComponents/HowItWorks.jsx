@@ -1,27 +1,16 @@
+import { Link } from 'react-router-dom';
+
 function HowItWorks() {
     return (
-        <section id="how-it-works" className="py-20 bg-white">
-        <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold">How It Works</h2>
-        </div>
-        <div className="flex flex-wrap justify-around">
-            <div className="w-full md:w-1/4 p-6 text-center">
-            <h3 className="text-xl font-semibold mb-4">Create an Account</h3>
-            <p>Sign up in seconds and get started.</p>
+        <section id="how-it-works" className="public-section public-container">
+            <div className="public-steps-panel">
+                <div className="public-steps-intro"><p className="public-eyebrow">SMALL STEPS. NEW POSSIBILITIES.</p><h2>From curious<br />to hands-on.</h2><p>Give your ideas somewhere to grow.</p><Link className="public-button public-button-mint" to="/register">Create your account <span aria-hidden="true">↗</span></Link></div>
+                <ol className="public-steps-list">
+                    <li><span className="public-step-number">01</span><div><h3>Make it yours</h3><p>Create a personal account and start with $100,000 in virtual cash.</p></div></li>
+                    <li><span className="public-step-number">02</span><div><h3>Explore, then take a position</h3><p>Choose a supported instrument, review its available quote, and place a simulated trade.</p></div></li>
+                    <li><span className="public-step-number">03</span><div><h3>Reflect on every move</h3><p>Follow your holdings and review your trade history. Bring what you learn into your next decision.</p></div></li>
+                </ol>
             </div>
-            <div className="w-full md:w-1/4 p-6 text-center">
-            <h3 className="text-xl font-semibold mb-4">Set Up Your Portfolio</h3>
-            <p>Start with virtual funds and choose the supported stocks you want to trade.</p>
-            </div>
-            <div className="w-full md:w-1/4 p-6 text-center">
-            <h3 className="text-xl font-semibold mb-4">Simulate Trades</h3>
-            <p>Place simulated buy and sell orders using available market quotes.</p>
-            </div>
-            <div className="w-full md:w-1/4 p-6 text-center">
-            <h3 className="text-xl font-semibold mb-4">Review Performance</h3>
-            <p>Analyze your trades and refine your strategies.</p>
-            </div>
-        </div>
         </section>
     );
 }

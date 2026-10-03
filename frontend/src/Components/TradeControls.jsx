@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import api, { authHeaders, errorMessage } from '../api';
+import Icon from './Icon';
 
 const CHECK_HISTORY = 'The earlier order result is uncertain. Check trade history before placing another order.';
 
@@ -90,8 +91,10 @@ function TradeControls({ selectedOption }) {
     };
 
     return (
-        <div className="p-4 bg-white shadow-md rounded-lg w-full max-w-md mx-auto" aria-busy={Boolean(pending)}>
-            <label htmlFor="trade-quantity" className="block font-medium mb-2">Quantity of {selectedOption}</label>
+        <div className="order-ticket panel" aria-busy={Boolean(pending)}>
+            <div className="order-ticket-heading"><div><p className="eyebrow">YOUR NEXT MOVE</p><h2>Order ticket</h2></div><Icon name="chart" size={21} /></div>
+            <div className="order-instrument"><strong>{selectedOption}</strong><span className="count-badge">Market order</span></div>
+            <label htmlFor="trade-quantity" className="field-label">Quantity of {selectedOption}</label>
             <input
                 id="trade-quantity"
                 type="number"
@@ -101,22 +104,25 @@ function TradeControls({ selectedOption }) {
                 onChange={changeQuantity}
                 disabled={Boolean(pending)}
                 placeholder="Enter quantity"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="quantity-input" aria-describedby="quantity-help"
             />
-            <p className="text-sm text-gray-600 mt-2">Fractional quantities are supported.</p>
-            <div className="flex gap-4 mt-4">
+            <p id="quantity-help" className="field-hint">Fractional quantities are supported.</p>
+            <div className="order-detail"><span>Execution</span><strong>Latest available quote</strong></div>
+            <div className="order-detail"><span>Account</span><strong>Paper trading</strong></div>
+            <div className="order-actions">
                 <button onClick={() => submitOrder('BUY')} disabled={Boolean(pending)}
-                    className="bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600 disabled:opacity-50">
+                    className="button order-buy">
                     {pending === 'BUY' ? 'Buying…' : 'Buy'}
                 </button>
                 <button onClick={() => submitOrder('SELL')} disabled={Boolean(pending)}
-                    className="bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600 disabled:opacity-50">
+                    className="button order-sell">
                     {pending === 'SELL' ? 'Selling…' : 'Sell'}
                 </button>
             </div>
-            {error && <p role="alert" className="text-red-600 mt-4">{error}</p>}
-            {retryNotice && <p className="text-gray-700 mt-2">{retryNotice}</p>}
-            {success && <p role="status" className="text-green-700 mt-4">{success}</p>}
+            <p className="order-disclaimer">Virtual funds only. Orders never reach a broker.</p>
+            {error && <p role="alert" className="notice notice-error">{error}</p>}
+            {retryNotice && <p className="notice notice-warning">{retryNotice}</p>}
+            {success && <p role="status" className="notice notice-success">{success}</p>}
         </div>
     );
 }

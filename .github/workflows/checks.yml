@@ -77,3 +77,12 @@ jobs:
         env:
           SIMTRADE_TEST_POSTGRES_URL: postgresql://simtrade:test-only-simtrade@localhost:5432/simtrade_test
           SIMTRADE_TEST_PYTHON: python
+
+      - name: Upload browser screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-screenshots
+          path: frontend/test-results/**/*.png
+          if-no-files-found: ignore
+          retention-days: 7

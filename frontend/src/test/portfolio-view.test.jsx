@@ -9,7 +9,6 @@ vi.mock('axios', () => {
   client.create = () => client;
   return { default: client };
 });
-vi.mock('highcharts-react-official', () => ({ default: () => <div /> }));
 
 beforeEach(() => {
   vi.clearAllMocks();

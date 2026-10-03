@@ -1,13 +1,161 @@
-.Lander {
-    font-family: Arial, sans-serif;
+.public-site { background: #fff; color: #152b28; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.6; }
+.public-site *, .auth-page * { box-sizing: border-box; }
+.public-container { width: min(1180px, calc(100% - 80px)); margin-inline: auto; }
+.public-site a, .auth-page a { text-decoration: none; }
+.public-site a:focus-visible, .public-site summary:focus-visible, .auth-page a:focus-visible, .auth-page button:focus-visible { outline: 3px solid #087f6a; outline-offset: 5px; }
+.public-site h1, .public-site h2, .public-site h3, .public-site p { margin: 0; }
+.public-skip-link { position: fixed; top: -100px; left: 20px; z-index: 30; padding: 12px 20px; border-radius: 8px; color: white; background: #087f6a; }
+.public-skip-link:focus { top: 16px; }
+.public-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 104px; }
+.public-brand { display: inline-flex; align-items: center; gap: 10px; color: #152b28; white-space: nowrap; font-size: 24px; font-weight: 750; letter-spacing: -1px; }
+.public-brand-dot { color: #087f6a; }
+.public-brand-mark { display: flex; align-items: flex-end; justify-content: center; gap: 3px; width: 34px; height: 34px; padding: 9px 8px; background: #087f6a; border-radius: 10px; transform: rotate(-3deg); }
+.public-brand-mark i { width: 4px; height: 8px; border-radius: 1px; background: #e1f9e9; }
+.public-brand-mark i:nth-child(2) { height: 12px; }
+.public-brand-mark i:nth-child(3) { height: 17px; }
+.public-nav, .public-header-actions { display: flex; align-items: center; gap: 30px; }
+.public-nav a, .public-login-link { font-size: 13px; font-weight: 600; color: #526561; }
+.public-nav a:hover, .public-login-link:hover { color: #087f6a; }
+.public-button { display: inline-flex; align-items: center; justify-content: center; gap: 28px; min-height: 52px; padding: 15px 22px; border: 1px solid transparent; border-radius: 8px; background: #087f6a; color: white; font-size: 14px; font-weight: 650; line-height: 1.4; cursor: pointer; transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease; }
+.public-button:hover { background: #056853; box-shadow: 0 5px 16px #087f6a18; transform: translateY(-1px); }
+.public-button span { font-size: 20px; line-height: 1; }
+.public-button-small { min-height: 42px; padding: 10px 16px; gap: 16px; font-size: 13px; }
+.public-hero { display: grid; grid-template-columns: 1.05fr 1fr; align-items: center; gap: 38px; padding-block: 76px 96px; }
+.public-eyebrow { display: flex; align-items: center; gap: 9px; color: #087f6a; font-size: 11px; font-weight: 700; letter-spacing: 1.25px; line-height: 1.6; }
+.public-status-dot { display: inline-block; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; background: #087f6a; box-shadow: 0 0 0 4px #087f6a10; }
+.public-hero .public-eyebrow { font-size: 11px; letter-spacing: .45px; }
+.public-hero h1 { margin-top: 24px; font-size: clamp(40px, 4.35vw, 61px); font-weight: 600; line-height: 1.14; letter-spacing: -2.7px; }
+.public-hero h1 span { color: #087f6a; }
+.public-hero .public-hero-description { max-width: 470px; margin-top: 24px; color: #677874; font-size: 15px; line-height: 1.9; }
+.public-hero-actions { display: flex; align-items: center; gap: 25px; margin-top: 32px; }
+.public-text-link { display: inline-flex; align-items: center; gap: 12px; color: #344e47; font-size: 13px; font-weight: 600; }
+.public-text-link:hover { color: #087f6a; }
+.public-hero .public-reassurance { display: flex; align-items: center; gap: 8px; margin-top: 23px; color: #75847e; font-size: 11px; }
+.public-reassurance span { color: #087f6a; }
+.public-hero-art { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 408px; border-radius: 24px; background: #f0f6f1; overflow: hidden; }
+.public-orbit { position: absolute; border: 1px solid #dce9dd; border-radius: 50%; pointer-events: none; }
+.public-orbit-one { width: 430px; height: 430px; top: -183px; right: -185px; }
+.public-orbit-two { width: 400px; height: 400px; bottom: -246px; left: -190px; }
+.public-start-card { position: relative; z-index: 1; width: calc(100% - 76px); margin-top: -32px; padding: 25px; border: 1px solid #edf3ed; border-radius: 16px; background: white; box-shadow: 0 15px 40px #1b492a0e; transform: rotate(-3deg); }
+.public-start-card-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.public-card-label { color: #728079; font-size: 8px; font-weight: 700; letter-spacing: 1px; }
+.public-virtual-badge { padding: 4px 7px; border-radius: 4px; color: #48816a; background: #edf7ed; font-size: 7px; font-weight: 700; letter-spacing: .8px; }
+.public-start-card .public-start-amount { margin-top: 17px; color: #1b3c2e; font-size: clamp(30px, 3.4vw, 47px); font-weight: 600; line-height: 1.15; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
+.public-start-amount span { color: #a2b7a7; font-size: .6em; letter-spacing: -1px; }
+.public-start-card .public-start-caption { margin-top: 6px; color: #89968d; font-size: 10px; }
+.public-practice-path { position: relative; height: 92px; margin-top: 12px; color: #b7d4bb; }
+.public-practice-path svg { width: 100%; height: 100%; }
+.public-path-dot { position: absolute; z-index: 1; width: 10px; height: 10px; border: 3px solid #d3eace; border-radius: 50%; background: #087f6a; }
+.public-path-dot-one { top: 63px; left: 3%; }
+.public-path-dot-two { top: 45px; left: 64%; }
+.public-path-dot-three { top: 5px; right: 3%; }
+.public-card-bottom { display: flex; align-items: center; justify-content: space-between; padding-top: 12px; border-top: 1px solid #eff3ef; color: #849289; font-size: 9px; }
+.public-card-arrow { display: grid; width: 25px; height: 25px; place-items: center; border-radius: 50%; background: #f0f7ef; color: #087f6a; font-size: 15px; }
+.public-learning-note { position: absolute; z-index: 2; right: 18px; bottom: 53px; display: flex; align-items: center; gap: 12px; padding: 14px 20px 14px 14px; border: 1px solid #e9efe5; border-radius: 12px; background: #fff; box-shadow: 0 9px 22px #204e3210; transform: rotate(3deg); }
+.public-note-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: #d8f3e7; color: #087f6a; font-size: 22px; }
+.public-learning-note strong, .public-learning-note div > span { display: block; }
+.public-learning-note strong { color: #375342; font-size: 11px; font-weight: 650; }
+.public-learning-note div > span { color: #87968a; font-size: 9px; }
+.public-art-caption { position: absolute; bottom: 19px; color: #859284; font-size: 9px; letter-spacing: .2px; }
+.public-section { padding-block: 75px; scroll-margin-top: 20px; }
+.public-features { background: #f6f8f7; border-block: 1px solid #eef2ef; }
+.public-section-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 35px; margin-bottom: 36px; }
+.public-section h2 { margin-top: 15px; text-align: left; color: #152b28; font-size: 36px; font-weight: 600; line-height: 1.25; letter-spacing: -1.4px; }
+.public-section-heading > p { max-width: 335px; color: #75817c; font-size: 13px; line-height: 1.85; }
+.public-feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.public-feature-card { display: flex; flex-direction: column; align-items: flex-start; padding: 29px; border: 1px solid #e5eae6; border-radius: 13px; background: #fff; }
+.public-feature-icon { display: grid; place-items: center; width: 42px; height: 42px; margin-bottom: 24px; border-radius: 10px; background: #ecf5ee; color: #087f6a; }
+.public-feature-icon svg { width: 23px; height: 23px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+.public-feature-card h3 { font-size: 17px; font-weight: 600; letter-spacing: -.4px; }
+.public-feature-card p { margin-top: 12px; color: #78847d; font-size: 12px; line-height: 1.9; }
+.public-feature-tag { margin-top: auto; padding-top: 24px; color: #428568; font-size: 10px; font-weight: 600; }
+.public-steps-panel { display: grid; grid-template-columns: .85fr 1fr; gap: 60px; padding: 56px; border-radius: 20px; color: white; background: #173d33; }
+.public-steps-panel .public-eyebrow { color: #a4c5b5; font-size: 9px; }
+.public-steps-panel h2 { color: white; font-size: 39px; }
+.public-steps-intro > p:not(.public-eyebrow) { margin-top: 18px; color: #a3bdb1; font-size: 13px; }
+.public-button-mint { margin-top: 27px; background: #d8f3e7; color: #173d33; }
+.public-button-mint:hover { background: #bfe9d6; }
+.public-steps-list { display: grid; gap: 25px; margin: 0; padding: 0; list-style: none; }
+.public-steps-list li { display: flex; gap: 20px; }
+.public-step-number { display: grid; flex-shrink: 0; place-items: center; width: 33px; height: 33px; border: 1px solid #436257; border-radius: 50%; color: #c7e1d2; font-size: 10px; }
+.public-steps-list h3 { padding-top: 2px; color: #f3f8f4; font-size: 14px; font-weight: 550; }
+.public-steps-list p { margin-top: 7px; color: #a5bcb1; font-size: 12px; line-height: 1.85; }
+.public-faq { display: grid; grid-template-columns: .85fr 1fr; align-items: start; gap: 60px; padding-top: 15px; padding-bottom: 90px; }
+.public-faq > div > p:not(.public-eyebrow) { max-width: 270px; margin-top: 20px; color: #7b8680; font-size: 13px; }
+.public-faq-list details { border-bottom: 1px solid #e6ebe7; }
+.public-faq-list summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 21px 0; color: #365045; font-size: 13px; font-weight: 600; cursor: pointer; list-style: none; }
+.public-faq-list summary::-webkit-details-marker { display: none; }
+.public-faq-list summary span { color: #70927c; font-size: 21px; font-weight: 400; }
+.public-faq-list details[open] summary span { transform: rotate(45deg); }
+.public-faq-list details p { padding: 0 30px 20px 0; color: #75837a; font-size: 12px; line-height: 1.9; }
+.public-footer { padding-top: 38px; border-top: 1px solid #eaf0eb; background: #f8faf8; }
+.public-footer-top { display: flex; align-items: center; justify-content: space-between; gap: 30px; padding-bottom: 35px; }
+.public-footer-top > div > p { margin-top: 12px; color: #8b978d; font-size: 11px; }
+.public-footer-top nav { display: flex; align-items: center; gap: 30px; }
+.public-footer-top nav a { color: #6b7d71; font-size: 12px; }
+.public-footer-top nav a:hover { color: #087f6a; }
+.public-footer-bottom { display: flex; justify-content: space-between; gap: 20px; padding-block: 22px; border-top: 1px solid #e5ebe5; color: #8a978d; font-size: 10px; }
+@media (max-width: 1050px) {
+    .public-container { width: calc(100% - 48px); }
+    .public-header { gap: 18px; }
+    .public-nav, .public-header-actions { gap: 20px; }
+    .public-hero { gap: 28px; padding-block: 50px 70px; }
+    .public-hero h1 { font-size: 47px; }
+    .public-start-card { width: calc(100% - 42px); padding: 20px; }
+    .public-hero-art { min-height: 390px; }
+    .public-hero-actions { gap: 17px; }
+    .public-hero-actions .public-button { gap: 15px; padding-inline: 16px; }
+    .public-feature-card { padding: 23px; }
+    .public-steps-panel { gap: 35px; padding: 40px; }
 }
-
-section {
-    padding: 50px 20px;
+@media (max-width: 760px) {
+    .public-header { min-height: 86px; }
+    .public-nav { display: none; }
+    .public-brand { font-size: 22px; }
+    .public-header-actions { gap: 17px; }
+    .public-hero { grid-template-columns: 1fr; gap: 44px; padding-block: 35px 55px; }
+    .public-hero-copy { max-width: 530px; }
+    .public-hero h1 { font-size: clamp(39px, 8vw, 58px); letter-spacing: -2px; }
+    .public-hero .public-hero-description { max-width: 490px; font-size: 14px; }
+    .public-hero-art { min-height: 360px; max-width: 490px; width: 100%; justify-self: center; }
+    .public-start-card { max-width: 375px; margin-top: -15px; padding: 24px; }
+    .public-start-card .public-start-amount { font-size: 46px; }
+    .public-learning-note { right: 16px; bottom: 40px; }
+    .public-art-caption { bottom: 10px; }
+    .public-section { padding-block: 52px; }
+    .public-section-heading { flex-direction: column; align-items: flex-start; gap: 18px; }
+    .public-section h2 { font-size: 30px; }
+    .public-section-heading > p { max-width: 430px; }
+    .public-feature-grid { grid-template-columns: 1fr; gap: 14px; }
+    .public-feature-card { padding: 25px; }
+    .public-feature-icon { margin-bottom: 18px; }
+    .public-feature-card p { max-width: 470px; font-size: 13px; }
+    .public-feature-tag { padding-top: 20px; }
+    .public-steps-panel { grid-template-columns: 1fr; gap: 40px; padding: 30px; }
+    .public-steps-list { gap: 25px; }
+    .public-steps-panel h2 { font-size: 34px; }
+    .public-faq { grid-template-columns: 1fr; gap: 25px; padding-top: 0; }
+    .public-faq > div > p:not(.public-eyebrow) { max-width: 430px; }
+    .public-footer-top { align-items: flex-start; flex-direction: column; gap: 25px; }
+    .public-footer-bottom { flex-direction: column; gap: 7px; }
 }
-
-h2 {
-    margin-bottom: 20px;
-    font-size: 2em;
-    text-align: center;
+@media (max-width: 390px) {
+    .public-container { width: calc(100% - 36px); }
+    .public-header-actions .public-button { padding-inline: 12px; gap: 8px; }
+    .public-header-actions { gap: 13px; }
+    .public-brand { gap: 7px; font-size: 20px; }
+    .public-brand-mark { width: 30px; height: 30px; padding: 7px 6px; }
+    .public-hero .public-eyebrow { font-size: 9px; }
+    .public-hero h1 { font-size: 38px; }
+    .public-hero-actions { gap: 16px; }
+    .public-text-link { font-size: 12px; gap: 8px; }
+    .public-hero-actions .public-button { font-size: 13px; padding-inline: 15px; gap: 12px; }
+    .public-start-card { padding: 20px; }
+    .public-start-card .public-start-amount { font-size: 39px; }
+    .public-card-label { font-size: 7px; }
+    .public-virtual-badge { font-size: 6px; }
+    .public-steps-panel { padding: 25px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .public-site *, .auth-page * { transition: none !important; scroll-behavior: auto !important; }
 }

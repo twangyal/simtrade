@@ -39,7 +39,8 @@ export default defineConfig({
     channel: 'chrome',
     launchOptions: { chromiumSandbox: true },
     serviceWorkers: 'block',
-    trace: 'retain-on-failure',
+    // Traces can contain bearer tokens and request bodies; publish screenshots only.
+    trace: 'off',
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'sandboxed-chrome' }],

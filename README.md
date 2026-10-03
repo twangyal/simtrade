@@ -107,6 +107,14 @@ Account net worth is cash plus the signed market value of all positions. When fr
 
 The dashboard calculates unrealized profit/loss as signed quantity times the difference between the mark and average entry price, for each open position and the portfolio total. Missing marks display `N/A`. These figures exclude realized gains/losses and the small cash effects of cent settlement; they are not a historical performance chart.
 
+## Interface and charts
+
+The workspace has persistent desktop navigation and a keyboard-accessible mobile drawer. Overview shows account snapshots, open holdings and their marked exposure; refresh actions reload failed or outdated account and activity snapshots. Selecting a holding opens its instrument directly in Trade. Activity displays execution history in local time. The public and authentication pages share the same visual system.
+
+The trading chart draws only quotes received while the instrument is open in the current browser. It retains up to 1,800 observations, preserves them across reconnects, and clears them when leaving the screen or changing instruments. The 1m and 5m controls select windows ending at the latest received quote; All shows the retained observations. Times are browser receipt times. Observed change compares the first and last visible observations, not daily returns. Empty and single-quote states do not invent a trend. Inspect exact observations by pointing at the chart or using the tick slider with the keyboard arrow keys. Prices use the instrument's quote units rather than assuming every instrument is quoted in USD.
+
+The position exposure chart uses absolute marked position values, so shorts contribute a positive share of gross exposure while remaining liabilities. It excludes cash and positions without a usable market mark, labels partial data, and provides the figures in a visible breakdown as well as the chart. It is a current portfolio snapshot, not historical performance. Demo quotes stay explicitly labelled as invented practice data.
+
 ## Order retries
 
 `POST /BUY` and `POST /SELL` accept an optional UUID `client_order_id` alongside `symbol` and `quantity`. Generate a new UUID for each intentional order and reuse it when retrying an uncertain result. A successful order stores a receipt in the same transaction as its cash, position and history changes. Matching retries return the original success without another fill, even after the quote expires. Reusing an ID for a different side, symbol or quantity returns `409`; failed orders do not reserve IDs. IDs are scoped to an account. Clients that omit the field retain the original behavior, where each accepted request creates a fill.
@@ -132,7 +140,7 @@ GitHub Actions runs the backend tests and frontend test/lint/build checks on pus
 
 ### Browser checks
 
-The Playwright suite runs the production frontend against an actual API with invented demo quotes. It covers registration, login, portfolio views, fractional trading, order replay, history and logout. GitHub Actions uses the runner's installed Google Chrome with its sandbox enabled; no vendor key or browser download is needed there.
+The Playwright suite runs the production frontend against an actual API with invented demo quotes. It covers desktop and mobile layouts, keyboard navigation, quote chart interaction, exposure charts, registration, login, fractional trading, order replay, history and logout. It checks for page overflow and browser errors and captures screenshots of the public, authentication and workspace screens. GitHub Actions uses the runner's installed Google Chrome with its sandbox enabled; no vendor key or browser download is needed there.
 
 To run it on a machine that supports Chrome's sandbox, install Google Chrome and use a dedicated local PostgreSQL database ending in `_test`:
 
@@ -142,6 +150,6 @@ SIMTRADE_TEST_PYTHON="$(pwd)/backend/.venv/bin/python" \
 npm --prefix frontend run test:e2e
 ```
 
-The suite validates the database URL before starting services, uses a synthetic signing key, and starts its own API on port 18765 and frontend preview on port 4173. It refuses to reuse existing servers. Both ports must be available. Test accounts remain in the disposable test database. Sandboxing is required; unsupported local environments can use the hosted CI result instead of disabling it. Failure screenshots and traces are written to ignored local test-output directories.
+The suite validates the database URL before starting services, uses a synthetic signing key, and starts its own API on port 18765 and frontend preview on port 4173. It refuses to reuse existing servers. Both ports must be available. Test accounts remain in the disposable test database. Sandboxing is required; unsupported local environments can use the hosted CI result instead of disabling it. Screenshots are written to ignored local test-output directories and uploaded by CI as the `browser-screenshots` artifact with seven-day retention. Only PNGs are uploaded; traces are disabled because they can include session tokens and request bodies.
 
 Password hashing uses bcrypt directly and continues to verify existing Passlib-generated `$2a$`, `$2b$`, and `$2y$` hashes. Passwords over 72 UTF-8 bytes are rejected rather than truncated. The backend uses PyJWT for token handling; unused Passlib and python-jose dependencies have been removed.

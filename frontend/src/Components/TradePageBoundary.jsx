@@ -1,6 +1,8 @@
 import { Component } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
+import AppShell from './AppShell';
+import Icon from './Icon';
 
 export default class TradePageBoundary extends Component {
   state = { failed: false };
@@ -12,14 +14,15 @@ export default class TradePageBoundary extends Component {
   render() {
     if (!this.state.failed) return this.props.children;
     return (
-      <section role="alert" className="min-h-screen bg-gray-100 p-6">
-        <h1 className="mb-4 text-2xl font-bold">The trading page could not load.</h1>
-        <p className="mb-4">Reload to try again, or return to your dashboard.</p>
-        <div className="flex flex-wrap items-center gap-4">
-          <button className="rounded bg-blue-600 px-4 py-2 text-white" onClick={() => window.location.reload()}>Reload page</button>
-          <Link className="text-blue-700 underline" to="/dashboard">Return to dashboard</Link>
+      <AppShell section="Trade"><section role="alert" className="panel route-recovery">
+        <span className="empty-state-icon"><Icon name="refresh" size={27} /></span>
+        <h1>The trading page could not load.</h1>
+        <p>Reload to try again, or return to your dashboard.</p>
+        <div className="recovery-actions">
+          <button className="button button-primary" onClick={() => window.location.reload()}>Reload page</button>
+          <Link className="button button-secondary" to="/dashboard">Return to dashboard</Link>
         </div>
-      </section>
+      </section></AppShell>
     );
   }
 }

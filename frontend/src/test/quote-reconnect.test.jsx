@@ -2,7 +2,6 @@ import { act, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import Info from '../Components/Info';
 
-vi.mock('highcharts-react-official', () => ({ default: () => <div /> }));
 
 let sockets;
 let rejectConnection;
@@ -33,18 +32,21 @@ it('recovers from a disconnect, preserving the last quote until replacement data
   quote(sockets[0], 123);
   act(() => sockets[0].onclose());
   expect(screen.getByRole('status').textContent).toMatch(/disconnected.*reconnect/i);
-  expect(screen.getByText('123')).toBeTruthy();
+  expect(screen.getByLabelText('Last received price').textContent).toBe('123.00');
+  expect(screen.getByRole('img').getAttribute('data-point-count')).toBe('1');
   tick(999);
   expect(sockets).toHaveLength(1);
   tick(1);
   expect(sockets).toHaveLength(2);
   act(() => sockets[1].onopen());
   quote(sockets[1], 125);
-  expect(screen.getByText('125')).toBeTruthy();
+  expect(screen.getByLabelText('Last received price').textContent).toBe('125.00');
+  expect(screen.getByRole('img').getAttribute('data-point-count')).toBe('2');
+  expect(screen.getByTestId('quote-price-line')).toBeTruthy();
   expect(screen.getByRole('status').textContent).toBe('Last received quote');
   quote(sockets[0], 999);
   act(() => sockets[0].onclose());
-  expect(screen.queryByText('999')).toBeNull();
+  expect(screen.queryByText('999.00')).toBeNull();
   expect(screen.getByRole('status').textContent).toBe('Last received quote');
 });
 
@@ -97,14 +99,14 @@ it('cancels the old instrument retry and listens only to the new instrument', ()
   quote(sockets[0], 123);
   act(() => sockets[0].onclose());
   rerender(<Info instrumentSelect="QQQ" />);
-  expect(screen.queryByText('123')).toBeNull();
+  expect(screen.queryByText('123.00')).toBeNull();
   expect(sockets).toHaveLength(2);
   tick(30000);
   expect(sockets).toHaveLength(2);
   quote(sockets[0], 999);
   quote(sockets[1], 456, 'QQQ');
-  expect(screen.queryByText('999')).toBeNull();
-  expect(screen.getByText('456')).toBeTruthy();
+  expect(screen.queryByText('999.00')).toBeNull();
+  expect(screen.getByLabelText('Last received price').textContent).toBe('456.00');
 });
 
 it('recovers if creating the initial browser socket throws', () => {
@@ -115,5 +117,5 @@ it('recovers if creating the initial browser socket throws', () => {
   tick(1000);
   expect(sockets).toHaveLength(1);
   quote(sockets[0], 127);
-  expect(screen.getByText('127')).toBeTruthy();
+  expect(screen.getByLabelText('Last received price').textContent).toBe('127.00');
 });

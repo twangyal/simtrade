@@ -1,23 +1,22 @@
 import PropTypes from 'prop-types';
+import { formatQuotePrice } from '../quoteFormat';
 
 function Price({ data, parentChange }) {
     if (!data || data.symbol !== parentChange) {
-        return <p className="text-center text-gray-500">Waiting for a quote…</p>;
+        return <p className="quote-waiting">Waiting for a quote…</p>;
     }
-    const { symbol, price, bid, ask } = data;
+    const { price, bid, ask } = data;
     const currentPrice = Array.isArray(price) ? price[0] : price;
     return (
-        <div className="p-4 bg-white shadow-md rounded-lg max-w-md mx-auto">
-            <div className="flex flex-col items-start space-y-2">
-                <div className="flex items-center space-x-4">
-                    <h2 className="text-2xl font-semibold text-gray-800">{symbol}</h2>
-                    <p className="text-xl font-bold text-green-600">{currentPrice ?? 'N/A'}</p>
-                </div>
-                <div className="flex flex-col space-y-1">
-                    {ask != null && <p className="text-md text-gray-700">Ask: {ask}</p>}
-                    {bid != null && <p className="text-md text-gray-700">Bid: {bid}</p>}
-                </div>
+        <div className="quote-price-row">
+            <div>
+                <span className="quote-price-label">Last received price</span>
+                <span className="quote-last-price" aria-label="Last received price">{currentPrice == null ? 'N/A' : formatQuotePrice(currentPrice)}</span>
             </div>
+            {(ask != null || bid != null) && <dl className="quote-spread">
+                {bid != null && <div><dt>Bid</dt><dd>{formatQuotePrice(bid)}</dd></div>}
+                {ask != null && <div><dt>Ask</dt><dd>{formatQuotePrice(ask)}</dd></div>}
+            </dl>}
         </div>
     );
 }

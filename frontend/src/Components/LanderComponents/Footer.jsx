@@ -1,24 +1,11 @@
 import { Link } from 'react-router-dom';
+import Brand from './Brand';
 
 function Footer() {
     return (
-        <footer className="bg-gray-800 text-white py-8">
-        <div className="footer-content flex flex-wrap justify-around text-center">
-            <div className="mb-6 md:mb-0">
-            <h4 className="text-lg font-semibold">PaperTradeSim</h4>
-            <p>Practice trading with virtual funds.</p>
-            </div>
-            <div>
-            <h4 className="text-lg font-semibold">Start Practicing</h4>
-            <nav aria-label="Account" className="mt-4 space-x-6">
-                <Link to="/register" className="hover:underline">Create an Account</Link>
-                <Link to="/login" className="hover:underline">Log In</Link>
-            </nav>
-            </div>
-        </div>
-        <div className="footer-bottom text-center mt-6 pt-4 border-t border-gray-600">
-            &copy; {new Date().getFullYear()} PaperTradeSim. All Rights Reserved.
-        </div>
+        <footer className="public-footer">
+            <div className="public-container public-footer-top"><div><Brand /><p>A little practice goes a long way.</p></div><nav aria-label="Account"><Link to="/register">Create an account</Link><Link to="/login">Log in</Link><a href="#faq">FAQs</a></nav></div>
+            <div className="public-container public-footer-bottom"><span>© {new Date().getFullYear()} SimTrade</span><span>Paper trading only. No real money. No financial advice.</span></div>
         </footer>
     );
 }

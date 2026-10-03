@@ -62,10 +62,9 @@ export default function MarketStatus({ selectedSymbol }) {
   }
 
   return (
-    <section aria-label="Market data status" aria-live="polite" className="mb-6 rounded-lg border border-gray-200 bg-white p-4">
-      <h2 className="font-semibold">{title}</h2>
-      {description && <p className="mt-1 text-sm text-gray-700">{description}</p>}
-      {availability && <p className="mt-1 text-sm text-gray-700">{availability}</p>}
+    <section aria-label="Market data status" aria-live="polite" className={`market-status market-status-${market?.mode ?? "unknown"}`}>
+      <span className="market-status-indicator" aria-hidden="true" />
+      <div className="market-status-copy"><div><h2>{title}</h2>{description && <p>{description}</p>}</div>{availability && <p>{availability}</p>}</div>
     </section>
   );
 }

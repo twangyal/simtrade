@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import api, { authHeaders, errorMessage, formatMoney } from '../api';
-import Sidebar from './Sidebar';
 import { portfolioGain, positionGain } from '../portfolio';
+import { instrumentDetails } from '../instruments';
+import AppShell from './AppShell';
+import Icon from './Icon';
 import MarketStatus from './MarketStatus';
+import PortfolioExposure from './PortfolioExposure';
 
 const Dashboard = () => {
     const [account, setAccount] = useState(null);
@@ -10,10 +14,13 @@ const Dashboard = () => {
     const [portfolioReady, setPortfolioReady] = useState(false);
     const [errors, setErrors] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [revision, setRevision] = useState(0);
+    const [updatedAt, setUpdatedAt] = useState(null);
 
     useEffect(() => {
         const controller = new AbortController();
+        setLoading(true);
+        setErrors([]);
         const fetchData = async () => {
             try {
                 const options = { headers: authHeaders(), signal: controller.signal };
@@ -23,12 +30,16 @@ const Dashboard = () => {
                 if (controller.signal.aborted) return;
                 const failures = [];
                 if (results[0].status === 'fulfilled') setAccount(results[0].value.data);
-                else failures.push(errorMessage(results[0].reason, 'Unable to load account data.'));
+                else { setAccount(null); failures.push(errorMessage(results[0].reason, 'Unable to load account data.')); }
                 if (results[1].status === 'fulfilled') {
                     setPortfolio(results[1].value.data);
                     setPortfolioReady(true);
+                } else {
+                    setPortfolio([]);
+                    setPortfolioReady(false);
+                    failures.push(errorMessage(results[1].reason, 'Unable to load portfolio.'));
                 }
-                else failures.push(errorMessage(results[1].reason, 'Unable to load portfolio.'));
+                setUpdatedAt(failures.length ? null : new Date());
                 setErrors([...new Set(failures)]);
             } catch (error) {
                 if (!controller.signal.aborted) setErrors([errorMessage(error, 'Unable to load your account.')]);
@@ -38,63 +49,55 @@ const Dashboard = () => {
         };
         fetchData();
         return () => controller.abort();
-    }, []);
+    }, [revision]);
 
-    return (
-        <div className="min-h-screen bg-gray-100 p-6 relative">
-            <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-            <button aria-label="Open navigation" aria-expanded={sidebarOpen}
-                className={`fixed top-4 right-4 text-2xl text-gray-600 ${sidebarOpen ? 'invisible' : ''}`}
-                onClick={() => setSidebarOpen(true)}>&#9776;</button>
-            <div className="max-w-7xl mx-auto">
-                <h1 className="text-3xl font-bold mb-6">{account ? `Welcome, ${account.username}` : 'Dashboard'}</h1>
-                <MarketStatus />
-                {loading && <p role="status" className="mb-4">Loading your account…</p>}
-                {errors.map((error) => <p key={error} role="alert" className="text-red-600 mb-4">{error}</p>)}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                    {[
-                        ['Cash Balance', account?.balance],
-                        ['Short Liability', account?.short_liability],
-                        ['Net Account Value', account?.networth],
-                        ['Unrealized P&L', portfolioReady ? portfolioGain(portfolio) : null],
-                    ].map(([label, value]) => (
-                        <div key={label} className="bg-white p-6 rounded-lg shadow-md">
-                            <h2 className="text-lg font-semibold">{label}</h2>
-                            <p className="text-2xl font-bold">{formatMoney(value)}</p>
-                        </div>
-                    ))}
-                </div>
-                {account?.valuation_estimated && <p className="mb-6 text-sm text-amber-800">Net account value includes estimates at entry prices where a market quote is unavailable.</p>}
-                <div className="bg-white p-6 rounded-lg shadow-md mb-6 overflow-x-auto">
-                    <h2 className="text-lg font-semibold mb-4">Portfolio</h2>
-                    <table className="min-w-full bg-white">
-                        <thead><tr>
-                            <th scope="col" className="py-2">Asset</th>
-                            <th scope="col" className="py-2">Quantity</th>
-                            <th scope="col" className="py-2">Average Price</th>
-                            <th scope="col" className="py-2">Total Value</th>
-                            <th scope="col" className="py-2">Unrealized P&L</th>
-                        </tr></thead>
-                        <tbody>
-                            {portfolio.map((item) => (
-                                <tr key={item.id ?? item.symbol}>
-                                    <td className="border-t px-6 py-4">{item.symbol}</td>
-                                    <td className="border-t px-6 py-4">{item.quantity}</td>
-                                    <td className="border-t px-6 py-4">{formatMoney(item.avg_price)}</td>
-                                    <td className="border-t px-6 py-4">{formatMoney(item.current_price == null ? null : item.quantity * item.current_price)}</td>
-                                    <td className="border-t px-6 py-4">{formatMoney(positionGain(item))}</td>
-                                </tr>
-                            ))}
-                            {!loading && !errors.length && !portfolio.length && <tr>
-                                <td colSpan="5" className="border-t px-6 py-4 text-center">No assets in portfolio</td>
-                            </tr>}
-                        </tbody>
+    const unrealized = portfolioReady ? portfolioGain(portfolio) : null;
+    const metrics = [
+        ['Net Account Value', account?.networth, 'Cash + signed position value', 'layers'],
+        ['Cash Balance', account?.balance, 'Simulated funds available', 'wallet'],
+        ['Unrealized P&L', unrealized, 'Open positions · last known marks', 'chart'],
+        ['Short Liability', account?.short_liability, 'Value of open short positions', 'down'],
+    ];
+    return <AppShell section="Overview">
+        <div className="page-heading">
+            <div><p className="eyebrow">YOUR NEXT CHAPTER STARTS HERE</p><h1>{account ? `Welcome, ${account.username}` : 'Dashboard'}</h1><p className="page-description">A clear view of your portfolio. A little more perspective for your next move.</p></div>
+            <Link className="button button-primary" to="/trade">Explore markets<Icon name="arrow" size={18} /></Link>
+        </div>
+        <MarketStatus />
+        <div className="section-toolbar"><div><span className="section-label">Account snapshot</span><span className="snapshot-time">{updatedAt ? `Updated ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Values in USD'}</span></div><button className="text-button" aria-label="Refresh account" disabled={loading} onClick={() => setRevision((value) => value + 1)}><Icon name="refresh" size={15} />{loading ? 'Refreshing' : 'Refresh'}</button></div>
+        {loading && <p role="status" className="loading-message">Loading your account…</p>}
+        {errors.map((error) => <p key={error} role="alert" className="notice notice-error">{error}</p>)}
+        <div className="metrics-grid" aria-busy={loading}>
+            {metrics.map(([label, value, caption, icon], index) => <section key={label} className={`metric-card${index === 0 ? ' metric-featured' : ''}`}>
+                <h2>{label}</h2><span className="metric-icon"><Icon name={icon} size={18} /></span>
+                <p className={`metric-value${label === 'Unrealized P&L' && value != null ? value < 0 ? ' value-negative' : value > 0 ? ' value-positive' : '' : ''}`}>{formatMoney(value)}</p>
+                <p className="metric-caption">{caption}</p>
+            </section>)}
+        </div>
+        {account?.valuation_estimated && <p className="notice notice-warning">Net account value includes estimates at entry prices where a market quote is unavailable.</p>}
+        <div className="portfolio-grid">
+            <section className="panel holdings-panel" aria-labelledby="holdings-title">
+                <div className="panel-heading"><div><p className="eyebrow">WHAT YOU HOLD</p><h2 id="holdings-title">Portfolio</h2></div><span className="count-badge">{portfolioReady ? `${portfolio.length} position${portfolio.length === 1 ? '' : 's'}` : '—'}</span></div>
+                <div className="table-scroll" tabIndex={0} role="region" aria-label="Portfolio holdings">
+                    <table className="data-table holdings-table">
+                        <thead><tr>{['Asset', 'Quantity', 'Average Price', 'Total Value', 'Unrealized P&L'].map((label) => <th key={label} scope="col">{label}</th>)}</tr></thead>
+                        <tbody>{portfolio.map((item) => {
+                            const instrument = instrumentDetails(item.symbol);
+                            const gain = positionGain(item);
+                            return <tr key={item.id ?? item.symbol}>
+                                <td><Link className="asset-cell" to={`/trade?symbol=${encodeURIComponent(item.symbol)}`} aria-label={`Trade ${item.symbol}`}><span className={`asset-badge asset-${instrument.category.toLowerCase()}`} aria-hidden="true">{instrument.badge}</span><span><strong>{item.symbol}</strong><small>{item.quantity < 0 ? 'Short' : 'Long'} position</small></span></Link></td>
+                                <td>{item.quantity}</td><td>{formatMoney(item.avg_price)}</td><td>{formatMoney(item.current_price == null ? null : item.quantity * item.current_price)}</td><td className={gain == null || gain === 0 ? '' : gain < 0 ? 'value-negative' : 'value-positive'}>{formatMoney(gain)}</td>
+                            </tr>;
+                        })}</tbody>
                     </table>
                 </div>
-                <p className="text-sm text-gray-600">Unrealized P&L uses average entry prices and the last known quote. It excludes realized gains, losses, and cash rounding.</p>
-            </div>
+                {!loading && portfolioReady && !portfolio.length && <div className="empty-state"><span className="empty-state-icon"><Icon name="layers" size={28} /></span><h3>No assets in portfolio</h3><p>Every portfolio starts with a first idea.<br />Find an instrument and make it yours.</p><Link className="button button-secondary" to="/trade">Make your first trade<Icon name="arrow" size={16} /></Link></div>}
+                {!loading && !portfolioReady && <div className="empty-state"><Icon name="refresh" size={24} /><h3>Your holdings could not load</h3><p>Refresh your account to try again.</p></div>}
+                <div className="panel-footnote">Unrealized P&L uses average entry prices and the last known quote. It excludes realized gains, losses, and cash rounding.</div>
+            </section>
+            <PortfolioExposure holdings={portfolio} loading={loading} unavailable={!loading && !portfolioReady} />
         </div>
-    );
+        <div className="learning-banner"><span className="learning-icon"><Icon name="shield" size={25} /></span><div><strong>Room to experiment. Space to learn.</strong><p>Your balance is virtual. Use it to explore position sizes, compare instruments, and develop your approach.</p></div><Link className="text-button" to="/trade-history">Review activity<Icon name="arrow" size={17} /></Link></div>
+    </AppShell>;
 };
-
 export default Dashboard;
