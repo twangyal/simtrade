@@ -6,18 +6,20 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-os.environ['SQLALCHEMY_DATABASE_URI'] = 'sqlite://'
-os.environ['SECRET_KEY'] = 'test-only-signing-key-with-more-than-32-bytes'
-os.environ['MARKET_DATA_ENABLED'] = 'false'
-
 from databases import Database
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 
-import main
-from database import Base
-from models import User, Portfolio, Trade
-from security import create_access_token
+with patch.dict(os.environ, {
+    'SQLALCHEMY_DATABASE_URI': 'sqlite://',
+    'SECRET_KEY': 'test-only-signing-key-with-more-than-32-bytes',
+    'MARKET_DATA_MODE': 'disabled',
+    'MARKET_DATA_ENABLED': 'false',
+}), patch('dotenv.load_dotenv', return_value=False):
+    import main
+    from database import Base
+    from models import User, Portfolio, Trade
+    from security import create_access_token
 
 
 class AccountApiTests(unittest.TestCase):

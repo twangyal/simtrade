@@ -48,7 +48,7 @@ class ConcurrentOrderTests(unittest.IsolatedAsyncioTestCase):
             "SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:",
             "SECRET_KEY": "concurrency-tests-only-signing-key-more-than-32-bytes",
             "MARKET_DATA_ENABLED": "false",
-        }):
+        }), patch("dotenv.load_dotenv", return_value=False):
             import crud
             import main
             from database import Base

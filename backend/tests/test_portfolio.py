@@ -13,7 +13,9 @@ from sqlalchemy import create_engine
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 # Importing models configures the app database; never use a developer database.
-with patch.dict(os.environ, {"SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"}):
+with patch.dict(os.environ, {"SQLALCHEMY_DATABASE_URI": "sqlite:///:memory:"}), patch(
+    "dotenv.load_dotenv", return_value=False,
+):
     import crud
     from database import Base
     from models import Portfolio, Trade, User

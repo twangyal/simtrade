@@ -97,6 +97,9 @@ class LifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.enterContext(patch.dict(os.environ, {
             "MARKET_DATA_ENABLED": "false", "API_KEY": "offline-test-key",
         }))
+        # These tests exercise defaults and the legacy flag. A developer's
+        # explicit mode would override both; restore it with the env patch.
+        os.environ.pop("MARKET_DATA_MODE", None)
         self.enterContext(patch.object(main, "database", FakeDatabase(self.events)))
         self.enterContext(patch.object(main, "connected_clients", self.clients))
         self.enterContext(patch.object(main, "quote_book", QuoteBook()))
