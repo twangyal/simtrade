@@ -214,9 +214,13 @@ async def read_trades(
     limit: int = Query(10, ge=1, le=100), page: int = Query(1, ge=1),
     user: TokenData = Depends(decode_access_token), db: Database = Depends(get_db, scope='function'),
 ):
+    offset = (page - 1) * limit
+    # PostgreSQL and SQLite bind OFFSET as a signed 64-bit integer.
+    if offset > 2**63 - 1:
+        raise HTTPException(status_code=422, detail='History offset must not exceed 9223372036854775807')
     record = await require_user(db, user.username)
     count = await crud.get_trade_count(db, record.id)
-    trades = await crud.get_trades(db, record.id, limit=limit, offset=limit * (page - 1))
+    trades = await crud.get_trades(db, record.id, limit=limit, offset=offset)
     return {'totalPages': math.ceil(count / limit), 'trades': [dict(trade) for trade in trades]}
 
 
@@ -235,7 +239,10 @@ async def execute_order(trade, user, db, side):
         notional = quantity * Decimal(str(price))
     if notional > MAX_ORDER_VALUE:
         raise HTTPException(status_code=400, detail='Order value exceeds the simulation limit')
-    held = Decimal(str(await crud.get_total_quantity_by_symbol(db, record.id, trade.symbol)))
+    try:
+        held = Decimal(str(await crud.get_total_quantity_by_symbol(db, record.id, trade.symbol)))
+    except crud.DuplicatePositionError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     signed_quantity = quantity if side == 'BUY' else -quantity
     reducing_position = held * signed_quantity < 0 and quantity <= abs(held)
     if notional < Decimal('0.01') and not reducing_position:

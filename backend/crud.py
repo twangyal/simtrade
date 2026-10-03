@@ -4,6 +4,25 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from sqlalchemy import func, select
 
+
+class DuplicatePositionError(ValueError):
+    """A legacy holding is ambiguous and must not be changed by a fill."""
+
+
+async def _get_single_position(db: Database, user_id: int, symbol: str):
+    query = (
+        Portfolio.__table__.select()
+        .where(Portfolio.user_id == user_id, Portfolio.symbol == symbol)
+        .limit(2)
+    )
+    positions = await db.fetch_all(query)
+    if len(positions) > 1:
+        raise DuplicatePositionError(
+            "Duplicate portfolio positions exist for this symbol; resolve the data conflict before trading."
+        )
+    return positions[0] if positions else None
+
+
 async def get_user(db: Database, username: str, *, for_update: bool = False):
     query = User.__table__.select().where(User.username == username)
     if for_update:
@@ -29,8 +48,7 @@ async def get_portfolio(db: Database, user_id: int):
     return portfolio
 
 async def get_total_quantity_by_symbol(db: Database, user_id: int, symbol: str):
-    query = Portfolio.__table__.select().where(Portfolio.user_id == user_id, Portfolio.symbol == symbol)
-    position = await db.fetch_one(query)
+    position = await _get_single_position(db, user_id, symbol)
     if position:
         return position.quantity
     return 0
@@ -92,8 +110,7 @@ async def create_trade(db: Database, user_id: int, symbol: str, quantity: float,
 
 async def add_to_portfolio(db: Database, user_id: int, symbol: str, quantity: float, price: float):
     """Apply a signed fill inside the caller's transaction and user row lock."""
-    query = Portfolio.__table__.select().where(Portfolio.user_id == user_id, Portfolio.symbol == symbol)
-    existing_position = await db.fetch_one(query)
+    existing_position = await _get_single_position(db, user_id, symbol)
     if existing_position:
         old_quantity = existing_position.quantity
         # Add the API's decimal quantities before converting to Float storage.
