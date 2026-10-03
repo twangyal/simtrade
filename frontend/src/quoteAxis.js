@@ -16,9 +16,17 @@ export function quoteAxis(low, high) {
 }
 
 export function formatAxisPrice(value, step) {
-  if (step < 1e-8) return value === 0 ? '0' : value.toExponential(2);
-  const exponent = Math.floor(Math.log10(step));
-  const fraction = step / 10 ** exponent;
-  const digits = Math.min(10, Math.max(0, -exponent + (Math.abs(fraction - 2.5) < 1e-8 ? 1 : 0)));
-  return new Intl.NumberFormat('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+  // Scientific components also work for subnormal steps where 10 ** exponent underflows.
+  const [stepFraction, stepExponent] = step.toExponential().split('e').map(Number);
+  const extraDigit = Math.abs(stepFraction - 2.5) < 1e-8 ? 1 : 0;
+  const digits = Math.max(0, -stepExponent + extraDigit);
+  const valueExponent = value === 0 ? 0 : Number(value.toExponential().split('e')[1]);
+
+  if (digits <= 10 && valueExponent + digits <= 16) {
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+  }
+  if (value === 0) return '0';
+  // Keep neighboring reference levels distinct without asking a Number for more than 17 significant digits.
+  const precision = Math.min(16, Math.max(0, valueExponent - stepExponent + extraDigit));
+  return value.toExponential(precision);
 }

@@ -17,7 +17,9 @@ function geometry(points, width, stats) {
   const { low, high } = axis;
   const firstTime = points[0].time;
   const duration = points.at(-1).time - firstTime;
-  const right = width - RIGHT;
+  const labels = [...axis.ticks].reverse().map((price) => formatAxisPrice(price, axis.step));
+  const axisWidth = Math.max(RIGHT, ...labels.map((label) => label.length * 5.7 + 22));
+  const right = Math.max(LEFT + 40, width - axisWidth);
   const position = (point) => ({
     x: duration ? LEFT + ((point.time - firstTime) / duration) * (right - LEFT) : (LEFT + right) / 2,
     y: BOTTOM - ((point.price - low) / (high - low)) * (BOTTOM - TOP),
@@ -25,8 +27,8 @@ function geometry(points, width, stats) {
   const plotted = points.map(position);
   const line = plotted.map(({ x, y }, index) => `${index ? 'L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`).join(' ');
   const area = `${line} L${plotted.at(-1).x.toFixed(2)},${BOTTOM} L${plotted[0].x.toFixed(2)},${BOTTOM} Z`;
-  const grid = [...axis.ticks].reverse().map((price, index) => ({
-    y: TOP + (index / (axis.ticks.length - 1)) * (BOTTOM - TOP), label: formatAxisPrice(price, axis.step),
+  const grid = labels.map((label, index) => ({
+    y: TOP + (index / (axis.ticks.length - 1)) * (BOTTOM - TOP), label,
   }));
   return { plotted, line, area, grid, right };
 }
@@ -108,8 +110,8 @@ export default function MarketQuoteChart({ points, symbol }) {
           </defs>
           {(shape?.grid ?? Array.from({ length: 5 }, (_, index) => ({ y: TOP + (index / 4) * (BOTTOM - TOP) }))).map((row, index) => (
             <g key={index}>
-              <line className="market-chart-gridline" x1={LEFT} y1={row.y} x2={width - RIGHT} y2={row.y} />
-              {row.label !== undefined && <text className="market-chart-axis" x={width - RIGHT + 14} y={row.y + 4}>{row.label}</text>}
+              <line className="market-chart-gridline" x1={LEFT} y1={row.y} x2={shape?.right ?? width - RIGHT} y2={row.y} />
+              {row.label !== undefined && <text className="market-chart-axis" x={shape.right + 14} y={row.y + 4}>{row.label}</text>}
             </g>
           ))}
           {shape && measured && <>

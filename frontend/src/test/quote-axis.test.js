@@ -23,3 +23,19 @@ it('keeps fractional reference levels distinct without binary floating point tai
   expect(formatAxisPrice(1.1025000000001, 0.000025)).toBe('1.102500');
   expect(formatAxisPrice(1.102525, 0.000025)).toBe('1.102525');
 });
+
+it.each([
+  [1.101250001, 1.101250002],
+  [60000, 60000.00000001],
+  [1e-8, 1.0001e-8],
+  [1e-320, 1.001e-320],
+])('keeps narrow-range axis labels distinct at %s to %s', (low, high) => {
+  const axis = quoteAxis(low, high);
+  const labels = axis.ticks.map((value) => formatAxisPrice(value, axis.step));
+  expect(new Set(labels).size).toBe(axis.ticks.length);
+  for (let index = 0; index < labels.length; index += 1) {
+    const displayed = Number(labels[index].replaceAll(',', ''));
+    expect(Number.isFinite(displayed)).toBe(true);
+    expect(Math.abs(displayed - axis.ticks[index])).toBeLessThanOrEqual(axis.step / 2);
+  }
+});
