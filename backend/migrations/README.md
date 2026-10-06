@@ -58,7 +58,7 @@ and a C compiler available for the pinned `psycopg2` dependency:
 
 ```sh
 python3.12 -m venv /tmp/simtrade-index-tests
-/tmp/simtrade-index-tests/bin/pip install -r backend/dependencies.txt aiosqlite==0.20.0
+/tmp/simtrade-index-tests/bin/pip install -r backend/dependencies.txt aiosqlite==0.20.0 httpx==0.28.1
 PYTHONPATH=backend /tmp/simtrade-index-tests/bin/python -m unittest discover -s backend/tests -v
 ```
 
@@ -92,7 +92,7 @@ SIMTRADE_TEST_PG_BIN=/path/to/postgresql/bin PYTHONPATH=backend \
   /tmp/simtrade-index-tests/bin/python -B -m unittest discover -s backend/tests -v
 ```
 
-All seven tests must pass with no skips. Without `SIMTRADE_TEST_PG_BIN`, the two
+All eight tests must pass with no skips. Without `SIMTRADE_TEST_PG_BIN`, the three
 PostgreSQL tests are explicitly skipped; the five SQLite tests still run. A cloud
 sandbox may require supported command-scoped network permission even for a private
 Unix socket. Keep proxy, TLS, and sandbox protections enabled.
@@ -123,3 +123,33 @@ environment, and uses an empty passfile. Proxy/CA variables are preserved. No sa
 environment or security configuration is modified. The temporary process-environment
 patch assumes this single-threaded unittest harness; do not reuse it in concurrent
 application connection code.
+
+### Reproducible PostgreSQL application smoke
+
+The same discovery command also runs `test_postgres_api_smoke.py`, using the shared
+disposable-cluster owner in `postgres_fixture.py`. A fresh subprocess imports the
+actual application, including its import-time `Base.metadata.create_all`, so cached
+SQLite modules from other tests cannot replace the PostgreSQL configuration. Both
+the synchronous engine and asynchronous application pool must report the owned
+data directory, synthetic role/database, and Unix-socket transport.
+
+The child disables dotenv loading, supplies synthetic signing/vendor values, and
+replaces only the incoming quote task with a synthetic AAPL quote of 100. A vendor
+WebSocket guard must remain uncalled. HTTP requests run in process through the real
+FastAPI app, lifespan, authentication, dependencies and routes; no HTTP listener is
+opened. Proxies and CA settings remain inherited. Ambient `PG*` settings are removed
+from the child environment and replaced with the owned socket/port/passfile settings.
+The caller environment and saved configuration are unchanged.
+
+The regression checks both new-table index definitions and successful registration,
+login, purchases, holdings/history and unauthenticated rejection. Two synthetic
+accounts buy two and three AAPL respectively; account reads must stay separate, and
+an independent connection after lifespan shutdown must see committed quantities,
+trades and cash balances of 99,800 and 99,700. The child has a 60-second timeout;
+unittest cleanup stops/removes the cluster even when the probe fails.
+
+This covers the previously one-off main API smoke, not the complete trading/browser
+suite. It does not assert current main's `/user_data` behavior: fresh registration
+leaves `networth` NULL, causing a response-validation failure already fixed and
+tested in PR #9. Production code is unchanged. Main's existing Passlib/bcrypt
+version warning can appear during successful authentication; it is not suppressed.
