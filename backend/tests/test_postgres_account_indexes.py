@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import psycopg2
 
@@ -27,15 +28,32 @@ class PostgresAccountIndexTests(unittest.TestCase):
         cls.data = cls.root / 'data'
         cls.socket = cls.root / 'socket'
         cls.socket.mkdir()
+        cls.passfile = cls.root / 'empty.pgpass'
+        cls.passfile.touch(mode=0o600)
         cls.run_pg('initdb', '-D', str(cls.data), '-U', 'synthetic',
                    '--auth-local=trust', '--auth-host=reject', '--no-locale')
         cls.addClassCleanup(cls.stop_pg)
         cls.run_pg('pg_ctl', '-D', str(cls.data), '-l', str(cls.root / 'server.log'),
                    '-o', f'-k {cls.socket} -h "" -p 55441', '-w', 'start')
-        cls.connection = psycopg2.connect(host=str(cls.socket), port=55441,
-                                         user='synthetic', dbname='postgres')
+        cls.connection = cls.connect()
         cls.connection.autocommit = True
         cls.addClassCleanup(cls.connection.close)
+
+    @classmethod
+    def connection_environment(cls):
+        # libpq merges ambient PGHOSTADDR/PGSERVICE even with explicit host/user/db.
+        # Preserve proxies, CA settings and all other environment variables.
+        return {**{key: value for key, value in os.environ.items()
+                   if not key.startswith('PG')}, 'PGPASSFILE': str(cls.passfile)}
+
+    @classmethod
+    def connect(cls):
+        # psycopg2 has no per-connection env argument. Restore the test process
+        # environment immediately afterward; this harness is single-threaded.
+        with patch.dict(os.environ, cls.connection_environment(), clear=True):
+            return psycopg2.connect(host=str(cls.socket), port=55441,
+                                    user='synthetic', dbname='postgres',
+                                    passfile=str(cls.passfile), connect_timeout=5)
 
     @classmethod
     def run_pg(cls, command, *args):
@@ -79,7 +97,7 @@ class PostgresAccountIndexTests(unittest.TestCase):
     def migrate(self):
         # psql executes each CONCURRENTLY statement outside a transaction and stops on errors.
         migration = Path(__file__).resolve().parents[1] / 'migrations/001_account_query_indexes.sql'
-        env = {**os.environ, 'PGOPTIONS': '-c search_path=fixture'}
+        env = {**self.connection_environment(), 'PGOPTIONS': '-c search_path=fixture'}
         subprocess.run([str(self.bin / 'psql'), '-X', '-h', str(self.socket),
                         '-p', '55441', '-U', 'synthetic', '-d', 'postgres',
                         '-v', 'ON_ERROR_STOP=1', '-f', str(migration)],
@@ -104,8 +122,32 @@ class PostgresAccountIndexTests(unittest.TestCase):
 
     def test_migration_rerun_preserves_data_and_valid_nonunique_definitions(self):
         before = self.snapshot()
-        self.migrate()
-        self.migrate()
+        # Invalid destinations fail before any network connection if filtering
+        # regresses. Exercise hostaddr and service independently, plus other
+        # ambient settings, through both real libpq clients.
+        conflicts = [
+            {'PGHOSTADDR': 'synthetic-invalid-ip'},
+            {'PGSERVICE': 'synthetic-missing-service',
+             'PGSERVICEFILE': str(self.root / 'missing-service.conf')},
+        ]
+        for conflict in conflicts:
+            injected = {**conflict, 'PGHOST': '/synthetic/missing/socket',
+                        'PGPORT': '1', 'PGUSER': 'synthetic-wrong-user',
+                        'PGDATABASE': 'synthetic-wrong-db',
+                        'PGOPTIONS': '-c search_path=synthetic_wrong_schema',
+                        'PGPASSFILE': str(self.root / 'missing-passfile')}
+            with self.subTest(conflict=next(iter(conflict))):
+                with patch.dict(os.environ, injected):
+                    connection = self.connect()
+                    try:
+                        with connection.cursor() as cursor:
+                            cursor.execute("SELECT current_setting('data_directory'), inet_server_addr(), current_user, current_database()")
+                            self.assertEqual(cursor.fetchone(),
+                                             (str(self.data), None, 'synthetic', 'postgres'))
+                    finally:
+                        connection.close()
+                    self.migrate()
+                    self.assertEqual({key: os.environ.get(key) for key in injected}, injected)
         self.assertEqual(self.snapshot(), before)
         self.cursor.execute("""SELECT c.relname, i.indisvalid, i.indisready, i.indisunique,
             am.amname, ARRAY(SELECT a.attname FROM unnest(i.indkey) WITH ORDINALITY k(attnum, ord)

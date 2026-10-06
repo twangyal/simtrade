@@ -112,3 +112,14 @@ sequential scans with the intended indexes, including a backward history scan
 without a sort; query results must remain unchanged. No planner settings or timing
 thresholds are forced. This rehearses the migration, not production deployment or
 concurrent-write performance.
+
+The rerun regression also injects conflicting libpq `PGHOSTADDR` and `PGSERVICE`
+settings independently, plus wrong host/port/user/database/search-path/passfile
+settings. Both psycopg2 and the real `psql` migration must still use the owned
+cluster. It verifies the server's data directory, Unix-socket transport, role,
+database, and unchanged caller environment. The harness removes ambient `PG*`
+variables only during psycopg2 connection creation and in the `psql` child
+environment, and uses an empty passfile. Proxy/CA variables are preserved. No saved
+environment or security configuration is modified. The temporary process-environment
+patch assumes this single-threaded unittest harness; do not reuse it in concurrent
+application connection code.
