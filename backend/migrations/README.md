@@ -81,3 +81,34 @@ SELECT count(*) FROM trades WHERE user_id = 5000;
 Compare results as well as plans. Measure buffers and rows read; avoid asserting
 wall-clock timing thresholds. These indexes do not change `main`'s API pagination
 or accounting behavior; those existing fixes are tracked separately in PR #9.
+
+### Reproducible PostgreSQL migration regression
+
+Install PostgreSQL server/client binaries (including `initdb`, `pg_ctl`, and `psql`)
+and use the test virtual environment above. Run as a non-root user:
+
+```sh
+SIMTRADE_TEST_PG_BIN=/path/to/postgresql/bin PYTHONPATH=backend \
+  /tmp/simtrade-index-tests/bin/python -B -m unittest discover -s backend/tests -v
+```
+
+All seven tests must pass with no skips. Without `SIMTRADE_TEST_PG_BIN`, the two
+PostgreSQL tests are explicitly skipped; the five SQLite tests still run. A cloud
+sandbox may require supported command-scoped network permission even for a private
+Unix socket. Keep proxy, TLS, and sandbox protections enabled.
+
+The PostgreSQL tests initialize their own temporary cluster, disable TCP listeners,
+reject host authentication, and use a private Unix socket inside a temporary
+directory. They never use an existing database URL or load an environment file.
+The cluster is stopped and removed through unittest cleanup, including on test
+failures. Local trust authentication applies only to this disposable cluster.
+
+The fixture uses the application's actual table definitions without the new
+indexes, with 10,000 synthetic accounts, 20,000 holdings, and 200,000 trades.
+Tests apply the real migration with `psql -X -v ON_ERROR_STOP=1`, rerun it, and
+assert unchanged ordered row-content digests, valid/ready non-unique B-tree index
+columns, and continued acceptance of duplicate legacy holdings. Plans must replace
+sequential scans with the intended indexes, including a backward history scan
+without a sort; query results must remain unchanged. No planner settings or timing
+thresholds are forced. This rehearses the migration, not production deployment or
+concurrent-write performance.
