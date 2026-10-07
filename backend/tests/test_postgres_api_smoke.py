@@ -1,7 +1,7 @@
 """Opt-in actual API regression against a newly created disposable PG schema.
 
 The app runs in a fresh process so SQLite modules cached by other tests cannot
-replace its real import-time configuration/create_all path. No env files or
+replace its real configuration/startup path. No env files or
 vendor credentials are used. Install httpx==0.28.1 and see migrations/README.md.
 """
 import os
@@ -26,6 +26,7 @@ class PostgresApiSmokeTests(DisposablePostgres, unittest.TestCase):
             'SQLALCHEMY_DATABASE_URI': 'postgresql://synthetic@:55441/postgres',
             'SECRET_KEY': 'synthetic-api-regression-signing-key',
             'API_KEY': 'synthetic-unused',
+            'MARKET_DATA_MODE': 'disabled', 'MARKET_DATA_ENABLED': 'false',
         }
         result = subprocess.run(
             [sys.executable, '-B', str(Path(__file__).resolve()),
@@ -40,6 +41,7 @@ class PostgresApiSmokeTests(DisposablePostgres, unittest.TestCase):
 
 def run_api_smoke(data_directory):
     import asyncio
+    from contextlib import ExitStack
     from unittest.mock import patch
 
     import httpx
@@ -54,25 +56,6 @@ def run_api_smoke(data_directory):
         server_query = ("SELECT current_setting('data_directory'), "
                         'inet_server_addr(), current_user, current_database()')
         try:
-            with main.engine.connect() as connection:
-                check.assertEqual(tuple(connection.exec_driver_sql(server_query).one()),
-                                  expected_server)
-                indexes = connection.exec_driver_sql("""
-                    SELECT c.relname, i.indisvalid, i.indisready, i.indisunique,
-                        am.amname, ARRAY(SELECT a.attname
-                            FROM unnest(i.indkey) WITH ORDINALITY k(attnum, ord)
-                            JOIN pg_attribute a ON a.attrelid=i.indrelid
-                                AND a.attnum=k.attnum ORDER BY k.ord)
-                    FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
-                    JOIN pg_am am ON am.oid=c.relam
-                    WHERE i.indrelid IN ('portfolios'::regclass, 'trades'::regclass)
-                """).all()
-                definitions = {row[0]: tuple(row[1:]) for row in indexes}
-                check.assertEqual(definitions.get('ix_portfolios_user_symbol'),
-                                  (True, True, False, 'btree', ['user_id', 'symbol']))
-                check.assertEqual(definitions.get('ix_trades_user_timestamp_id'),
-                                  (True, True, False, 'btree', ['user_id', 'timestamp', 'id']))
-
             async def exercise_api():
                 feed_ready = asyncio.Event()
 
@@ -80,12 +63,38 @@ def run_api_smoke(data_directory):
                     main.instrument_list['AAPL'] = [100.0]
                     feed_ready.set()
 
-                with patch.object(main, 'receive_data_from_api', synthetic_feed):
+                with ExitStack() as quotes:
+                    legacy_feed = hasattr(main, 'receive_data_from_api')
+                    if legacy_feed:
+                        quotes.enter_context(patch.object(main, 'receive_data_from_api', synthetic_feed))
                     async with main.app.router.lifespan_context(main.app):
-                        await asyncio.wait_for(feed_ready.wait(), timeout=5)
+                        if legacy_feed:
+                            await asyncio.wait_for(feed_ready.wait(), timeout=5)
+                        else:
+                            # PR #9 initializes its QuoteBook and tables in lifespan.
+                            check.assertEqual(main.app.state.market_mode, 'disabled')
+                            check.assertTrue(main.quote_book.update({'symbol': 'AAPL', 'price': 100.0}))
                         check.assertTrue(main.database.is_connected)
                         server = await main.database.fetch_one(server_query)
                         check.assertEqual(tuple(server.values()), expected_server)
+                        with main.engine.connect() as connection:
+                            check.assertEqual(tuple(connection.exec_driver_sql(server_query).one()),
+                                              expected_server)
+                            indexes = connection.exec_driver_sql("""
+                                SELECT c.relname, i.indisvalid, i.indisready, i.indisunique,
+                                    am.amname, ARRAY(SELECT a.attname
+                                        FROM unnest(i.indkey) WITH ORDINALITY k(attnum, ord)
+                                        JOIN pg_attribute a ON a.attrelid=i.indrelid
+                                            AND a.attnum=k.attnum ORDER BY k.ord)
+                                FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid
+                                JOIN pg_am am ON am.oid=c.relam
+                                WHERE i.indrelid IN ('portfolios'::regclass, 'trades'::regclass)
+                            """).all()
+                            definitions = {row[0]: tuple(row[1:]) for row in indexes}
+                            check.assertEqual(definitions.get('ix_portfolios_user_symbol'),
+                                              (True, True, False, 'btree', ['user_id', 'symbol']))
+                            check.assertEqual(definitions.get('ix_trades_user_timestamp_id'),
+                                              (True, True, False, 'btree', ['user_id', 'timestamp', 'id']))
                         async with httpx.AsyncClient(
                             transport=httpx.ASGITransport(app=main.app),
                             base_url='http://synthetic.test', timeout=10,

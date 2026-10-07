@@ -128,13 +128,18 @@ application connection code.
 
 The same discovery command also runs `test_postgres_api_smoke.py`, using the shared
 disposable-cluster owner in `postgres_fixture.py`. A fresh subprocess imports the
-actual application, including its import-time `Base.metadata.create_all`, so cached
-SQLite modules from other tests cannot replace the PostgreSQL configuration. Both
+actual application and enters its lifespan, so cached SQLite modules from other
+tests cannot replace the PostgreSQL configuration. Index inspection occurs after
+startup: this covers both main's import-time `Base.metadata.create_all` and PR #9's
+lifespan-owned schema initialization. Both
 the synchronous engine and asynchronous application pool must report the owned
 data directory, synthetic role/database, and Unix-socket transport.
 
 The child disables dotenv loading, supplies synthetic signing/vendor values, and
-replaces only the incoming quote task with a synthetic AAPL quote of 100. A vendor
+explicitly disables live market mode. On legacy main it replaces the incoming quote
+task with a synthetic AAPL quote of 100; with PR #9 it submits that quote to the
+actual `QuoteBook` after lifespan initializes it. It never precreates application
+tables or skips the smoke for the newer interface. A vendor
 WebSocket guard must remain uncalled. HTTP requests run in process through the real
 FastAPI app, lifespan, authentication, dependencies and routes; no HTTP listener is
 opened. Proxies and CA settings remain inherited. Ambient `PG*` settings are removed
@@ -153,3 +158,9 @@ suite. It does not assert current main's `/user_data` behavior: fresh registrati
 leaves `networth` NULL, causing a response-validation failure already fixed and
 tested in PR #9. Production code is unchanged. Main's existing Passlib/bcrypt
 version warning can appear during successful authentication; it is not suppressed.
+
+When checking integration with PR #9, use a disposable combined source tree and a
+separate virtual environment with that tree's pinned application and test
+dependencies, plus `httpx==0.28.1` for this smoke. Run the same opt-in suite; keep
+the standalone main checks as well. PR #9's normal CI does not set
+`SIMTRADE_TEST_PG_BIN`, so a normal CI run does not establish this opt-in compatibility.
