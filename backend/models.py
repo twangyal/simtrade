@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.schema import Index
 from database import Base
 from datetime import datetime
 
@@ -18,6 +19,9 @@ class User(Base):
 
 class Trade(Base):
     __tablename__ = 'trades'
+    __table_args__ = (
+        Index('ix_trades_user_timestamp_id', 'user_id', 'timestamp', 'id'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'))
@@ -31,6 +35,9 @@ class Trade(Base):
 
 class Portfolio(Base):
     __tablename__ = 'portfolios'
+    __table_args__ = (
+        Index('ix_portfolios_user_symbol', 'user_id', 'symbol'),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey('users.id'))
